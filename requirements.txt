@@ -21,7 +21,6 @@ email-validator==2.2.0
 
 # Image Upload
 cloudinary==1.41.0
-python-magic-bin==0.4.14
 
 # Push Notifications
 firebase-admin==6.6.0
