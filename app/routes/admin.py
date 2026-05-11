@@ -1,0 +1,274 @@
+"""
+PropertyKING — Admin Routes
+Dashboard, property review, user management, broadcast notifications.
+"""
+
+from fastapi import APIRouter, HTTPException, Depends, Query
+from bson import ObjectId
+from typing import Optional
+import math
+
+from app.database import get_database
+from app.middleware.auth import require_admin
+from app.models.property import PropertyReject
+from app.models.notification import BroadcastNotification
+from app.services.push_notification import send_push_notification, broadcast_notification
+from app.services.email_service import send_property_approved_email, send_property_rejected_email
+from app.utils.helpers import now_utc
+
+router = APIRouter(prefix="/admin", tags=["Admin"])
+
+
+@router.get("/dashboard")
+async def admin_dashboard(admin: dict = Depends(require_admin)):
+    """Get admin dashboard analytics."""
+    db = get_database()
+
+    total_users = await db.users.count_documents({"role": {"$ne": "admin"}})
+    total_listers = await db.users.count_documents({"role": "lister"})
+    total_properties = await db.properties.count_documents({})
+    active_properties = await db.properties.count_documents({"status": "active"})
+    pending_properties = await db.properties.count_documents({"status": "pending"})
+    rejected_properties = await db.properties.count_documents({"status": "rejected"})
+    sold_properties = await db.properties.count_documents({"status": "sold"})
+    total_inquiries = await db.inquiries.count_documents({})
+    pending_inquiries = await db.inquiries.count_documents({"status": "pending"})
+    total_reviews = await db.reviews.count_documents({})
+    total_favorites = await db.favorites.count_documents({})
+
+    # Properties by type
+    type_pipeline = [
+        {"$match": {"status": "active"}},
+        {"$group": {"_id": "$property_type_id", "count": {"$sum": 1}}},
+        {"$sort": {"count": -1}}
+    ]
+    type_stats = await db.properties.aggregate(type_pipeline).to_list(20)
+    for stat in type_stats:
+        if stat["_id"]:
+            try:
+                pt = await db.property_types.find_one({"_id": ObjectId(stat["_id"])})
+                stat["name"] = pt["name"] if pt else "Unknown"
+            except Exception:
+                stat["name"] = "Unknown"
+
+    # Properties by state
+    state_pipeline = [
+        {"$match": {"status": "active"}},
+        {"$group": {"_id": "$location.state", "count": {"$sum": 1}}},
+        {"$sort": {"count": -1}}, {"$limit": 10}
+    ]
+    state_stats = await db.properties.aggregate(state_pipeline).to_list(10)
+
+    # Listing type distribution
+    listing_pipeline = [
+        {"$match": {"status": "active"}},
+        {"$group": {"_id": "$listing_type", "count": {"$sum": 1}}}
+    ]
+    listing_stats = await db.properties.aggregate(listing_pipeline).to_list(5)
+
+    return {
+        "users": {"total": total_users, "listers": total_listers},
+        "properties": {
+            "total": total_properties, "active": active_properties,
+            "pending": pending_properties, "rejected": rejected_properties, "sold": sold_properties
+        },
+        "inquiries": {"total": total_inquiries, "pending": pending_inquiries},
+        "reviews": total_reviews,
+        "favorites": total_favorites,
+        "by_type": [{"type": s.get("name", s["_id"]), "count": s["count"]} for s in type_stats],
+        "by_state": [{"state": s["_id"], "count": s["count"]} for s in state_stats],
+        "by_listing_type": [{"type": s["_id"], "count": s["count"]} for s in listing_stats]
+    }
+
+
+@router.get("/properties")
+async def admin_list_properties(
+    page: int = Query(1, ge=1), limit: int = Query(20, ge=1, le=100),
+    status_filter: Optional[str] = Query(None, alias="status"),
+    search: Optional[str] = None,
+    admin: dict = Depends(require_admin)
+):
+    """List all properties (admin view)."""
+    db = get_database()
+    query = {}
+    if status_filter:
+        query["status"] = status_filter
+    if search:
+        query["$or"] = [
+            {"title": {"$regex": search, "$options": "i"}},
+            {"location.city": {"$regex": search, "$options": "i"}}
+        ]
+
+    total = await db.properties.count_documents(query)
+    skip = (page - 1) * limit
+    cursor = db.properties.find(query).sort("created_at", -1).skip(skip).limit(limit)
+
+    properties = []
+    async for prop in cursor:
+        lister = None
+        if prop.get("listed_by"):
+            try:
+                lister = await db.users.find_one({"_id": ObjectId(prop["listed_by"])})
+            except Exception:
+                pass
+        pt = None
+        if prop.get("property_type_id"):
+            try:
+                pt = await db.property_types.find_one({"_id": ObjectId(prop["property_type_id"])})
+            except Exception:
+                pass
+
+        primary_img = None
+        for img in prop.get("images", []):
+            if img.get("is_primary"):
+                primary_img = img["url"]
+                break
+        if not primary_img and prop.get("images"):
+            primary_img = prop["images"][0].get("url")
+
+        properties.append({
+            "id": str(prop["_id"]), "title": prop.get("title", ""), "slug": prop.get("slug", ""),
+            "status": prop.get("status", ""), "price": prop.get("price", 0),
+            "listing_type": prop.get("listing_type", ""),
+            "property_type": pt.get("name") if pt else None,
+            "city": prop.get("location", {}).get("city", ""),
+            "state": prop.get("location", {}).get("state", ""),
+            "image": primary_img,
+            "lister_name": lister.get("full_name") if lister else None,
+            "lister_email": lister.get("email") if lister else None,
+            "views": prop.get("views_count", 0),
+            "favorites": prop.get("favorites_count", 0),
+            "inquiries": prop.get("inquiries_count", 0),
+            "created_at": prop.get("created_at"),
+            "admin_review": prop.get("admin_review")
+        })
+
+    return {"properties": properties, "total": total, "page": page, "limit": limit,
+            "total_pages": math.ceil(total / limit) if limit > 0 else 0}
+
+
+@router.put("/properties/{property_id}/approve")
+async def approve_property(property_id: str, admin: dict = Depends(require_admin)):
+    """Approve a pending property listing."""
+    db = get_database()
+    try:
+        prop = await db.properties.find_one({"_id": ObjectId(property_id)})
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid property ID")
+    if not prop:
+        raise HTTPException(status_code=404, detail="Property not found")
+
+    await db.properties.update_one(
+        {"_id": ObjectId(property_id)},
+        {"$set": {
+            "status": "active", "listed_at": now_utc(), "updated_at": now_utc(),
+            "admin_review": {"reviewed_by": admin["_id"], "reviewed_at": now_utc(), "rejection_reason": None}
+        }})
+
+    # Notify lister
+    await send_push_notification(prop["listed_by"], "Listing Approved! ✅",
+        f"Your property '{prop.get('title', '')}' is now live!", "property_approved",
+        {"property_id": property_id})
+
+    try:
+        lister = await db.users.find_one({"_id": ObjectId(prop["listed_by"])})
+        if lister:
+            await send_property_approved_email(lister["email"], lister["full_name"], prop.get("title", ""))
+    except Exception:
+        pass
+
+    return {"message": "Property approved", "success": True}
+
+
+@router.put("/properties/{property_id}/reject")
+async def reject_property(property_id: str, data: PropertyReject, admin: dict = Depends(require_admin)):
+    """Reject a pending property listing."""
+    db = get_database()
+    try:
+        prop = await db.properties.find_one({"_id": ObjectId(property_id)})
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid property ID")
+    if not prop:
+        raise HTTPException(status_code=404, detail="Property not found")
+
+    await db.properties.update_one(
+        {"_id": ObjectId(property_id)},
+        {"$set": {
+            "status": "rejected", "updated_at": now_utc(),
+            "admin_review": {"reviewed_by": admin["_id"], "reviewed_at": now_utc(), "rejection_reason": data.reason}
+        }})
+
+    await send_push_notification(prop["listed_by"], "Listing Needs Changes",
+        f"Your property '{prop.get('title', '')}' was not approved.", "property_rejected",
+        {"property_id": property_id})
+
+    try:
+        lister = await db.users.find_one({"_id": ObjectId(prop["listed_by"])})
+        if lister:
+            await send_property_rejected_email(lister["email"], lister["full_name"], prop.get("title", ""), data.reason)
+    except Exception:
+        pass
+
+    return {"message": "Property rejected", "success": True}
+
+
+@router.get("/users")
+async def admin_list_users(
+    page: int = Query(1, ge=1), limit: int = Query(20, ge=1, le=100),
+    role: Optional[str] = None, search: Optional[str] = None,
+    admin: dict = Depends(require_admin)
+):
+    """List all users (admin view)."""
+    db = get_database()
+    query = {}
+    if role:
+        query["role"] = role
+    if search:
+        query["$or"] = [
+            {"full_name": {"$regex": search, "$options": "i"}},
+            {"email": {"$regex": search, "$options": "i"}}
+        ]
+
+    total = await db.users.count_documents(query)
+    skip = (page - 1) * limit
+    cursor = db.users.find(query, {"password_hash": 0}).sort("created_at", -1).skip(skip).limit(limit)
+
+    users = []
+    async for user in cursor:
+        listings_count = await db.properties.count_documents({"listed_by": str(user["_id"])})
+        users.append({
+            "id": str(user["_id"]), "full_name": user.get("full_name", ""),
+            "email": user.get("email", ""), "phone": user.get("phone"),
+            "avatar": user.get("avatar"), "role": user.get("role", "user"),
+            "lister_type": user.get("lister_type"), "verified": user.get("verified", False),
+            "is_active": user.get("is_active", True), "listings_count": listings_count,
+            "location": user.get("location"), "created_at": user.get("created_at")
+        })
+
+    return {"users": users, "total": total, "page": page, "limit": limit,
+            "total_pages": math.ceil(total / limit) if limit > 0 else 0}
+
+
+@router.put("/users/{user_id}/status")
+async def toggle_user_status(user_id: str, admin: dict = Depends(require_admin)):
+    """Activate/Deactivate a user."""
+    db = get_database()
+    try:
+        user = await db.users.find_one({"_id": ObjectId(user_id)})
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid user ID")
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    new_status = not user.get("is_active", True)
+    await db.users.update_one({"_id": ObjectId(user_id)}, {"$set": {"is_active": new_status, "updated_at": now_utc()}})
+
+    return {"message": f"User {'activated' if new_status else 'deactivated'}", "is_active": new_status, "success": True}
+
+
+@router.post("/notifications/broadcast")
+async def send_broadcast(data: BroadcastNotification, admin: dict = Depends(require_admin)):
+    """Broadcast notification to users."""
+    count = await broadcast_notification(
+        data.title, data.body, data.type, data.data, data.target_roles, data.target_states)
+    return {"message": f"Notification sent to {count} users", "recipients": count, "success": True}

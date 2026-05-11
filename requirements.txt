@@ -1,0 +1,42 @@
+# FastAPI Core
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+python-multipart==0.0.20
+
+# Database
+motor==3.7.0
+pymongo==4.10.1
+beanie==1.27.0
+
+# Auth
+PyJWT==2.10.1
+passlib[bcrypt]==1.7.4
+bcrypt==4.2.1
+python-jose[cryptography]==3.3.0
+
+# Validation
+pydantic[email]==2.10.4
+pydantic-settings==2.7.1
+email-validator==2.2.0
+
+# Image Upload
+cloudinary==1.41.0
+python-magic-bin==0.4.14
+
+# Push Notifications
+firebase-admin==6.6.0
+
+# Email
+resend==2.7.0
+
+# Geocoding
+httpx==0.28.1
+geopy==2.4.1
+
+# Utils
+python-dotenv==1.0.1
+python-slugify==8.0.4
+Pillow==11.1.0
+
+# Date handling
+python-dateutil==2.9.0
