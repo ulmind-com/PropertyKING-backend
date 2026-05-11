@@ -90,3 +90,36 @@ async def delete_image(public_id: str) -> bool:
         return result.get("result") == "ok"
     except Exception:
         return False
+
+
+async def upload_video(file: UploadFile, folder: str = "propertyking/videos") -> dict:
+    """Upload a video to Cloudinary."""
+    allowed_video_ext = {"mp4", "mov", "avi", "webm", "mkv"}
+    ext = file.filename.split(".")[-1].lower() if file.filename else ""
+    if ext not in allowed_video_ext:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Video type '{ext}' not allowed. Allowed: {', '.join(allowed_video_ext)}"
+        )
+
+    content = await file.read()
+    max_video_size = 50 * 1024 * 1024  # 50MB limit for videos
+
+    if len(content) > max_video_size:
+        raise HTTPException(status_code=400, detail="Video size exceeds 50MB limit")
+
+    try:
+        result = cloudinary.uploader.upload(
+            content,
+            folder=folder,
+            resource_type="video",
+        )
+        return {
+            "url": result["secure_url"],
+            "public_id": result["public_id"],
+            "duration": result.get("duration"),
+            "format": result.get("format"),
+            "bytes": result.get("bytes")
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Video upload failed: {str(e)}")
