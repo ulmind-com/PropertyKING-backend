@@ -204,7 +204,7 @@ async def nearby_properties(
 
     query = {
         "status": "active",
-        "location.coordinates.coordinates": {
+        "location.coordinates": {
             "$nearSphere": {
                 "$geometry": {"type": "Point", "coordinates": [lng, lat]},
                 "$maxDistance": miles_to_meters(radius_miles)

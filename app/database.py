@@ -39,7 +39,12 @@ async def create_indexes():
     await db.users.create_index([("location.coordinates", "2dsphere")])
 
     # Properties indexes
-    await db.properties.create_index([("location.coordinates.coordinates", "2dsphere")])
+    # Drop old wrong geo index if exists, then create correct one
+    try:
+        await db.properties.drop_index("location.coordinates.coordinates_2dsphere")
+    except Exception:
+        pass
+    await db.properties.create_index([("location.coordinates", "2dsphere")])
     await db.properties.create_index("status")
     await db.properties.create_index("property_type_id")
     await db.properties.create_index("listing_type")
