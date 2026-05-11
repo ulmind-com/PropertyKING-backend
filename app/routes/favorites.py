@@ -33,29 +33,17 @@ async def get_favorites(
         try:
             prop = await db.properties.find_one({"_id": ObjectId(fav["property_id"])})
             if prop:
-                primary_image = None
-                for img in prop.get("images", []):
-                    if img.get("is_primary"):
-                        primary_image = img["url"]
-                        break
-                if not primary_image and prop.get("images"):
-                    primary_image = prop["images"][0].get("url")
-
+                from app.utils.helpers import serialize_doc
+                fav_prop = serialize_doc(prop)
+                fav_prop["is_favorited"] = True # Automatically true since it's in favorites
+                
                 favorites.append({
-                    "id": str(fav["_id"]),
-                    "property_id": fav["property_id"],
-                    "property_title": prop.get("title", ""),
-                    "property_slug": prop.get("slug", ""),
-                    "property_image": primary_image,
-                    "property_price": prop.get("price", 0),
-                    "property_location": f"{prop.get('location', {}).get('city', '')}, {prop.get('location', {}).get('state', '')}",
-                    "property_bedrooms": prop.get("details", {}).get("bedrooms", 0),
-                    "property_bathrooms": prop.get("details", {}).get("bathrooms", 0),
-                    "property_sqft": prop.get("details", {}).get("total_sqft"),
-                    "property_status": prop.get("status", ""),
+                    "id": str(fav_prop["id"]), # Use property ID as the main ID for the card
+                    "favorite_id": str(fav["_id"]),
+                    "property": fav_prop,
                     "created_at": fav.get("created_at")
                 })
-        except Exception:
+        except Exception as e:
             continue
 
     return {
