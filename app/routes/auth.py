@@ -58,12 +58,6 @@ async def register(data: UserRegister):
             detail="Email already registered"
         )
 
-    # Validate lister fields
-    if data.role == "lister" and not data.lister_type:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Lister type is required for lister accounts"
-        )
 
     # Create user document
     user_doc = {
@@ -72,10 +66,10 @@ async def register(data: UserRegister):
         "phone": data.phone,
         "password_hash": hash_password(data.password),
         "avatar": None,
-        "role": data.role,
-        "lister_type": data.lister_type if data.role == "lister" else None,
-        "license_number": data.license_number if data.role == "lister" else None,
-        "company_name": data.company_name if data.role == "lister" else None,
+        "role": "user",
+        "lister_type": None,
+        "license_number": None,
+        "company_name": None,
         "bio": None,
         "verified": False,
         "fcm_token": None,
@@ -91,7 +85,7 @@ async def register(data: UserRegister):
 
     # Generate tokens
     user_id = str(result.inserted_id)
-    access_token = create_access_token(user_id, data.role)
+    access_token = create_access_token(user_id, "user")
     refresh_token = create_refresh_token(user_id)
 
     # Send welcome email (non-blocking)

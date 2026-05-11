@@ -38,10 +38,6 @@ class UserRegister(BaseModel):
     email: EmailStr
     phone: Optional[str] = Field(None, pattern=r"^\+?1?\d{10,15}$")
     password: str = Field(..., min_length=6, max_length=128)
-    role: UserRole = UserRole.USER
-    lister_type: Optional[ListerType] = None
-    license_number: Optional[str] = None
-    company_name: Optional[str] = None
 
 
 class UserLogin(BaseModel):

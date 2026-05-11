@@ -319,7 +319,7 @@ async def get_property(slug: str, current_user: Optional[dict] = Depends(get_cur
 
 
 @router.post("", response_model=PropertyResponse, status_code=status.HTTP_201_CREATED)
-async def create_property(data: PropertyCreate, current_user: dict = Depends(require_lister)):
+async def create_property(data: PropertyCreate, current_user: dict = Depends(get_current_user)):
     """Create a new property listing."""
     db = get_database()
 
