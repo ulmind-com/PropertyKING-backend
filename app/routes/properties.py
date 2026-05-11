@@ -217,14 +217,20 @@ async def nearby_properties(
     if listing_type:
         query["listing_type"] = listing_type
 
-    total = await db.properties.count_documents(query)
-    skip = (page - 1) * limit
-
-    cursor = db.properties.find(query).skip(skip).limit(limit)
-    properties = []
+    # count_documents doesn't support $nearSphere, so we fetch and count
+    cursor = db.properties.find(query).limit(limit * page)
+    all_results = []
     current_user_id = current_user["_id"] if current_user else None
 
     async for prop in cursor:
+        all_results.append(prop)
+
+    total = len(all_results)
+    skip = (page - 1) * limit
+    paged = all_results[skip:skip + limit]
+
+    properties = []
+    for prop in paged:
         prop = await enrich_property(prop, current_user_id)
         properties.append(build_property_response(prop))
 
