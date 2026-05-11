@@ -120,6 +120,7 @@ class PropertyCreate(BaseModel):
     images: List[PropertyImage] = []
     video_url: Optional[str] = None
     floor_plan_url: Optional[str] = None
+    floor_plan_urls: Optional[List[str]] = []
     contact_phone: Optional[str] = None
     contact_email: Optional[str] = None
 
@@ -138,6 +139,7 @@ class PropertyUpdate(BaseModel):
     images: Optional[List[PropertyImage]] = None
     video_url: Optional[str] = None
     floor_plan_url: Optional[str] = None
+    floor_plan_urls: Optional[List[str]] = None
     contact_phone: Optional[str] = None
     contact_email: Optional[str] = None
 
@@ -202,6 +204,7 @@ class PropertyResponse(BaseModel):
     images: List[PropertyImage] = []
     video_url: Optional[str] = None
     floor_plan_url: Optional[str] = None
+    floor_plan_urls: Optional[List[str]] = []
     listed_by: str
     lister_name: Optional[str] = None
     lister_avatar: Optional[str] = None
