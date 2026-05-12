@@ -249,7 +249,7 @@ async def my_listings(
 ):
     """Get properties listed by current user."""
     db = get_database()
-    query = {"listed_by": current_user["_id"]}
+    query = {"listed_by": {"$in": [str(current_user["_id"]), current_user["_id"]]}}
 
     total = await db.properties.count_documents(query)
     skip = (page - 1) * limit
