@@ -18,11 +18,13 @@ PROPERTIES = [
                      "coordinates": {"type": "Point", "coordinates": [-73.9957, 40.6975]}},
         "images": [{"url": "https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?w=800", "is_primary": True, "order": 0},
                    {"url": "https://images.unsplash.com/photo-1600566753086-00f18fb6b3ea?w=800", "is_primary": False, "order": 1},
-                   {"url": "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=800", "is_primary": False, "order": 2}],
+                   {"url": "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=800", "is_primary": False, "order": 2},
+                   {"url": "https://images.unsplash.com/photo-1600573472550-8090b5e0745e?w=800", "is_primary": False, "order": 3},
+                   {"url": "https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?w=800", "is_primary": False, "order": 4}],
         "video_url": "https://www.youtube.com/watch?v=y9j-BL5ocW8",
         "floor_plan_urls": [
-            "https://cdn.houseplansservices.com/product/m12dckksnj0ibnjdskh7qj2sq0/w1024.jpg?v=9",
-            "https://cdn.houseplansservices.com/product/101hmsa9649h3c5d60s9j2s9c4/w1024.jpg?v=9"
+            "https://images.unsplash.com/photo-1574359173348-71e1e5c6b48c?w=800",
+            "https://images.unsplash.com/photo-1503387837-b154d5074bd2?w=800"
         ]
     },
     {
@@ -34,8 +36,12 @@ PROPERTIES = [
                      "coordinates": {"type": "Point", "coordinates": [-80.1867, 25.8095]}},
         "images": [{"url": "https://images.unsplash.com/photo-1564013799919-ab600027ffc6?w=800", "is_primary": True, "order": 0},
                    {"url": "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=800", "is_primary": False, "order": 1},
-                   {"url": "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=800", "is_primary": False, "order": 2}],
-        "floor_plan_urls": ["https://cdn.houseplansservices.com/product/i17v089n179j2h49j2947h8s20/w1024.jpg?v=9"]
+                   {"url": "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=800", "is_primary": False, "order": 2},
+                   {"url": "https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?w=800", "is_primary": False, "order": 3}],
+        "video_url": "https://www.youtube.com/watch?v=MP9AHOxICnU",
+        "floor_plan_urls": [
+            "https://images.unsplash.com/photo-1574359173348-71e1e5c6b48c?w=800"
+        ]
     },
     {
         "title": "Charming 3BR Ranch Home in Austin",
@@ -45,7 +51,13 @@ PROPERTIES = [
         "location": {"address": "2415 Barton Hills Drive", "city": "Austin", "state": "TX", "zip_code": "78704", "county": "Travis County",
                      "coordinates": {"type": "Point", "coordinates": [-97.7729, 30.2421]}},
         "images": [{"url": "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=800", "is_primary": True, "order": 0},
-                   {"url": "https://images.unsplash.com/photo-1583608205776-bfd35f0d9f83?w=800", "is_primary": False, "order": 1}]
+                   {"url": "https://images.unsplash.com/photo-1583608205776-bfd35f0d9f83?w=800", "is_primary": False, "order": 1},
+                   {"url": "https://images.unsplash.com/photo-1600047509807-ba8f99d2cdde?w=800", "is_primary": False, "order": 2},
+                   {"url": "https://images.unsplash.com/photo-1600585154526-990dced4db0d?w=800", "is_primary": False, "order": 3}],
+        "floor_plan_urls": [
+            "https://images.unsplash.com/photo-1503387837-b154d5074bd2?w=800",
+            "https://images.unsplash.com/photo-1574359173348-71e1e5c6b48c?w=800"
+        ]
     },
     {
         "title": "Spacious 5BR Family Home in Naperville",
@@ -56,10 +68,13 @@ PROPERTIES = [
                      "coordinates": {"type": "Point", "coordinates": [-88.1535, 41.7508]}},
         "images": [{"url": "https://images.unsplash.com/photo-1600585154526-990dced4db0d?w=800", "is_primary": True, "order": 0},
                    {"url": "https://images.unsplash.com/photo-1600573472550-8090b5e0745e?w=800", "is_primary": False, "order": 1},
-                   {"url": "https://images.unsplash.com/photo-1600607686527-6fb886090705?w=800", "is_primary": False, "order": 2}],
+                   {"url": "https://images.unsplash.com/photo-1600607686527-6fb886090705?w=800", "is_primary": False, "order": 2},
+                   {"url": "https://images.unsplash.com/photo-1600566753190-17f0baa2a6c3?w=800", "is_primary": False, "order": 3},
+                   {"url": "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=800", "is_primary": False, "order": 4}],
+        "video_url": "https://www.youtube.com/watch?v=dCKvFb2HTGY",
         "floor_plan_urls": [
-            "https://cdn.houseplansservices.com/product/101hmsa9649h3c5d60s9j2s9c4/w1024.jpg?v=9",
-            "https://cdn.houseplansservices.com/product/m12dckksnj0ibnjdskh7qj2sq0/w1024.jpg?v=9"
+            "https://images.unsplash.com/photo-1574359173348-71e1e5c6b48c?w=800",
+            "https://images.unsplash.com/photo-1503387837-b154d5074bd2?w=800"
         ]
     },
     {
@@ -70,7 +85,12 @@ PROPERTIES = [
         "location": {"address": "825 E 4th Street", "city": "Los Angeles", "state": "CA", "zip_code": "90013", "county": "Los Angeles County",
                      "coordinates": {"type": "Point", "coordinates": [-118.2330, 34.0407]}},
         "images": [{"url": "https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=800", "is_primary": True, "order": 0},
-                   {"url": "https://images.unsplash.com/photo-1536376072261-38c75010e6c9?w=800", "is_primary": False, "order": 1}]
+                   {"url": "https://images.unsplash.com/photo-1536376072261-38c75010e6c9?w=800", "is_primary": False, "order": 1},
+                   {"url": "https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?w=800", "is_primary": False, "order": 2},
+                   {"url": "https://images.unsplash.com/photo-1600566753086-00f18fb6b3ea?w=800", "is_primary": False, "order": 3}],
+        "floor_plan_urls": [
+            "https://images.unsplash.com/photo-1503387837-b154d5074bd2?w=800"
+        ]
     },
     {
         "title": "Waterfront 3BR Townhouse in Seattle",
@@ -81,10 +101,13 @@ PROPERTIES = [
                      "coordinates": {"type": "Point", "coordinates": [-122.3755, 47.5745]}},
         "images": [{"url": "https://images.unsplash.com/photo-1600047509807-ba8f99d2cdde?w=800", "is_primary": True, "order": 0},
                    {"url": "https://images.unsplash.com/photo-1600566753190-17f0baa2a6c3?w=800", "is_primary": False, "order": 1},
-                   {"url": "https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?w=800", "is_primary": False, "order": 2}],
+                   {"url": "https://images.unsplash.com/photo-1600210492486-724fe5c67fb0?w=800", "is_primary": False, "order": 2},
+                   {"url": "https://images.unsplash.com/photo-1600585154526-990dced4db0d?w=800", "is_primary": False, "order": 3},
+                   {"url": "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=800", "is_primary": False, "order": 4}],
         "video_url": "https://www.youtube.com/watch?v=y9j-BL5ocW8",
         "floor_plan_urls": [
-            "https://cdn.houseplansservices.com/product/i17v089n179j2h49j2947h8s20/w1024.jpg?v=9"
+            "https://images.unsplash.com/photo-1574359173348-71e1e5c6b48c?w=800",
+            "https://images.unsplash.com/photo-1503387837-b154d5074bd2?w=800"
         ]
     },
 ]
