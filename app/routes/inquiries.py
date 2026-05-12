@@ -40,8 +40,10 @@ async def create_inquiry(data: InquiryCreate, current_user: dict = Depends(get_c
         "status": "pending",
         "response": None,
         "responded_at": None,
-        "contact_phone": data.contact_phone,
+        "contact_phone": data.contact_phone or current_user.get("phone"),
         "preferred_date": data.preferred_date,
+        "preferred_time": data.preferred_time,
+        "contact_preference": data.contact_preference,
         "created_at": now_utc()
     }
 
@@ -71,7 +73,9 @@ async def create_inquiry(data: InquiryCreate, current_user: dict = Depends(get_c
         property_title=prop.get("title"), user_id=current_user["_id"],
         user_name=current_user.get("full_name"), lister_id=prop["listed_by"],
         message=data.message, inquiry_type=data.inquiry_type,
-        status="pending", created_at=doc["created_at"])
+        status="pending", contact_phone=data.contact_phone or current_user.get("phone"),
+        preferred_date=data.preferred_date, preferred_time=data.preferred_time,
+        contact_preference=data.contact_preference, created_at=doc["created_at"])
 
 
 @router.get("/sent")

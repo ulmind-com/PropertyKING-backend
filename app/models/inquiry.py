@@ -16,6 +16,13 @@ class InquiryType(str, Enum):
     GENERAL = "general"
 
 
+class ContactPreference(str, Enum):
+    CALL = "call"
+    WHATSAPP = "whatsapp"
+    IN_PERSON = "in_person"
+    VIDEO_CALL = "video_call"
+
+
 class InquiryStatus(str, Enum):
     PENDING = "pending"
     RESPONDED = "responded"
@@ -28,6 +35,8 @@ class InquiryCreate(BaseModel):
     inquiry_type: InquiryType = InquiryType.GENERAL
     contact_phone: Optional[str] = None
     preferred_date: Optional[str] = None
+    preferred_time: Optional[str] = None
+    contact_preference: Optional[str] = None
 
 
 class InquiryRespond(BaseModel):
@@ -52,4 +61,6 @@ class InquiryResponse(BaseModel):
     responded_at: Optional[datetime] = None
     contact_phone: Optional[str] = None
     preferred_date: Optional[str] = None
+    preferred_time: Optional[str] = None
+    contact_preference: Optional[str] = None
     created_at: Optional[datetime] = None
