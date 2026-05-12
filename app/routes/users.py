@@ -31,7 +31,7 @@ def build_user_resp(user: dict, favorites_count=0, listings_count=0) -> UserResp
 async def get_my_profile(current_user: dict = Depends(get_current_user)):
     db = get_database()
     fav_count = await db.favorites.count_documents({"user_id": current_user["_id"]})
-    list_count = await db.properties.count_documents({"listed_by": current_user["_id"]})
+    list_count = await db.properties.count_documents({"listed_by": {"$in": [str(current_user["_id"]), current_user["_id"]]}})
     return build_user_resp(current_user, fav_count, list_count)
 
 
@@ -47,7 +47,7 @@ async def update_my_profile(data: UserProfileUpdate, current_user: dict = Depend
     updated = await db.users.find_one({"_id": ObjectId(current_user["_id"])})
     updated["_id"] = str(updated["_id"])
     fav_count = await db.favorites.count_documents({"user_id": current_user["_id"]})
-    list_count = await db.properties.count_documents({"listed_by": current_user["_id"]})
+    list_count = await db.properties.count_documents({"listed_by": {"$in": [str(current_user["_id"]), current_user["_id"]]}})
     return build_user_resp(updated, fav_count, list_count)
 
 
