@@ -319,7 +319,23 @@ async def get_property(slug: str, current_user: Optional[dict] = Depends(get_cur
     # Increment views
     await db.properties.update_one({"_id": prop["_id"]}, {"$inc": {"views_count": 1}})
 
+    # Track who viewed (logged-in users only, don't track lister viewing own property)
     current_user_id = current_user["_id"] if current_user else None
+    if current_user_id and current_user_id != prop.get("listed_by"):
+        await db.property_views.update_one(
+            {"property_id": str(prop["_id"]), "user_id": current_user_id},
+            {"$set": {
+                "property_id": str(prop["_id"]),
+                "user_id": current_user_id,
+                "user_name": current_user.get("full_name"),
+                "user_email": current_user.get("email"),
+                "user_phone": current_user.get("phone"),
+                "user_avatar": current_user.get("avatar"),
+                "last_viewed_at": now_utc(),
+            }, "$inc": {"view_count": 1}, "$setOnInsert": {"first_viewed_at": now_utc()}},
+            upsert=True
+        )
+
     prop = await enrich_property(prop, current_user_id)
 
     return build_property_response(prop)
@@ -451,5 +467,54 @@ async def delete_property(property_id: str, current_user: dict = Depends(get_cur
     await db.favorites.delete_many({"property_id": property_id})
     await db.inquiries.delete_many({"property_id": property_id})
     await db.reviews.delete_many({"property_id": property_id})
+    await db.property_views.delete_many({"property_id": property_id})
 
     return {"message": "Property deleted", "success": True}
+
+
+@router.get("/{property_id}/viewers")
+async def get_property_viewers(
+    property_id: str,
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=100),
+    current_user: dict = Depends(get_current_user)
+):
+    """Get users who viewed a property (leads). Only property owner or admin can see."""
+    db = get_database()
+
+    try:
+        prop = await db.properties.find_one({"_id": ObjectId(property_id)})
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid property ID")
+
+    if not prop:
+        raise HTTPException(status_code=404, detail="Property not found")
+
+    if prop["listed_by"] != current_user["_id"] and current_user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Not authorized to view leads")
+
+    total = await db.property_views.count_documents({"property_id": property_id})
+    skip = (page - 1) * limit
+
+    cursor = db.property_views.find({"property_id": property_id}).sort("last_viewed_at", -1).skip(skip).limit(limit)
+    viewers = []
+
+    async for v in cursor:
+        viewers.append({
+            "user_id": v.get("user_id"),
+            "user_name": v.get("user_name"),
+            "user_email": v.get("user_email"),
+            "user_phone": v.get("user_phone"),
+            "user_avatar": v.get("user_avatar"),
+            "view_count": v.get("view_count", 1),
+            "first_viewed_at": v.get("first_viewed_at"),
+            "last_viewed_at": v.get("last_viewed_at"),
+        })
+
+    return {
+        "viewers": viewers,
+        "total": total,
+        "page": page,
+        "limit": limit,
+        "total_pages": math.ceil(total / limit) if limit > 0 else 0
+    }
