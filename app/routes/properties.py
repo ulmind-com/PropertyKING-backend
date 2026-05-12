@@ -241,6 +241,35 @@ async def nearby_properties(
     )
 
 
+@router.get("/my-listings", response_model=PropertyListResponse)
+async def my_listings(
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=100),
+    current_user: dict = Depends(get_current_user)
+):
+    """Get properties listed by current user."""
+    db = get_database()
+    query = {"listed_by": current_user["_id"]}
+
+    total = await db.properties.count_documents(query)
+    skip = (page - 1) * limit
+
+    cursor = db.properties.find(query).sort("created_at", -1).skip(skip).limit(limit)
+    properties = []
+
+    async for prop in cursor:
+        prop = await enrich_property(prop, current_user["_id"])
+        properties.append(build_property_response(prop))
+
+    return PropertyListResponse(
+        properties=properties,
+        total=total,
+        page=page,
+        limit=limit,
+        total_pages=math.ceil(total / limit) if limit > 0 else 0
+    )
+
+
 @router.get("/recommendations", response_model=PropertyListResponse)
 async def recommended_properties(
     page: int = Query(1, ge=1),
