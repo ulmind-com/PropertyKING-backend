@@ -142,7 +142,10 @@ async def list_properties(
             {"location.neighborhood": {"$regex": search, "$options": "i"}}
         ]
     if property_type_id:
-        query["property_type_id"] = property_type_id
+        try:
+            query["property_type_id"] = ObjectId(property_type_id)
+        except Exception:
+            query["property_type_id"] = property_type_id
     if listing_type:
         query["listing_type"] = listing_type
     if min_price is not None:
