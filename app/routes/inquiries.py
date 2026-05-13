@@ -115,6 +115,8 @@ async def get_sent_inquiries(
             lister_id=inq.get("lister_id", ""), message=inq.get("message", ""),
             inquiry_type=inq.get("inquiry_type", "general"), status=inq.get("status", "pending"),
             response=inq.get("response"), responded_at=inq.get("responded_at"),
+            contact_phone=inq.get("contact_phone"), preferred_date=inq.get("preferred_date"),
+            preferred_time=inq.get("preferred_time"), contact_preference=inq.get("contact_preference"),
             created_at=inq.get("created_at")))
 
     return {"inquiries": inquiries, "total": total, "page": page, "limit": limit,
@@ -164,6 +166,7 @@ async def get_received_inquiries(
             inquiry_type=inq.get("inquiry_type", "general"), status=inq.get("status", "pending"),
             response=inq.get("response"), responded_at=inq.get("responded_at"),
             contact_phone=inq.get("contact_phone"), preferred_date=inq.get("preferred_date"),
+            preferred_time=inq.get("preferred_time"), contact_preference=inq.get("contact_preference"),
             created_at=inq.get("created_at")))
 
     return {"inquiries": inquiries, "total": total, "page": page, "limit": limit,
