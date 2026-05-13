@@ -227,3 +227,5 @@ class PropertyListResponse(BaseModel):
     page: int
     limit: int
     total_pages: int
+    total_views: Optional[int] = None
+    total_inquiries: Optional[int] = None
