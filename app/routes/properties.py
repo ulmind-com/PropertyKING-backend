@@ -279,7 +279,7 @@ async def top_viewed_properties(
 ):
     """Get properties sorted by most views, excluding specified IDs."""
     db = get_database()
-    query = {"status": "active", "views_count": {"$gt": 0}}
+    query = {"status": "active"}
 
     if exclude_ids:
         ids_to_exclude = [eid.strip() for eid in exclude_ids.split(",") if eid.strip()]
