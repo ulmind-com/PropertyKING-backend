@@ -270,21 +270,70 @@ async def my_listings(
     )
 
 
+@router.get("/top-viewed", response_model=PropertyListResponse)
+async def top_viewed_properties(
+    page: int = Query(1, ge=1),
+    limit: int = Query(10, ge=1, le=50),
+    exclude_ids: Optional[str] = Query(None, description="Comma-separated property IDs to exclude"),
+    current_user: Optional[dict] = Depends(get_current_user_optional)
+):
+    """Get properties sorted by most views, excluding specified IDs."""
+    db = get_database()
+    query = {"status": "active", "views_count": {"$gt": 0}}
+
+    if exclude_ids:
+        ids_to_exclude = [eid.strip() for eid in exclude_ids.split(",") if eid.strip()]
+        obj_ids = []
+        for eid in ids_to_exclude:
+            try:
+                obj_ids.append(ObjectId(eid))
+            except Exception:
+                pass
+        query["_id"] = {"$nin": obj_ids + [ObjectId(e) for e in ids_to_exclude if len(e) == 24]}
+
+    total = await db.properties.count_documents(query)
+    skip = (page - 1) * limit
+
+    cursor = db.properties.find(query).sort("views_count", -1).skip(skip).limit(limit)
+    properties = []
+    current_user_id = current_user["_id"] if current_user else None
+
+    async for prop in cursor:
+        prop = await enrich_property(prop, current_user_id)
+        properties.append(build_property_response(prop))
+
+    return PropertyListResponse(
+        properties=properties, total=total, page=page, limit=limit,
+        total_pages=math.ceil(total / limit) if limit > 0 else 0
+    )
+
+
 @router.get("/recommendations", response_model=PropertyListResponse)
 async def recommended_properties(
     page: int = Query(1, ge=1),
     limit: int = Query(20, ge=1, le=100),
+    exclude_ids: Optional[str] = Query(None, description="Comma-separated property IDs to exclude"),
     current_user: Optional[dict] = Depends(get_current_user_optional)
 ):
-    """Get recommended properties (most viewed, newest, featured)."""
+    """Get recommended/featured properties, excluding specified IDs."""
     db = get_database()
     query = {"status": "active"}
+
+    if exclude_ids:
+        ids_to_exclude = [eid.strip() for eid in exclude_ids.split(",") if eid.strip()]
+        obj_ids = []
+        for eid in ids_to_exclude:
+            try:
+                obj_ids.append(ObjectId(eid))
+            except Exception:
+                pass
+        query["_id"] = {"$nin": obj_ids + [ObjectId(e) for e in ids_to_exclude if len(e) == 24]}
 
     total = await db.properties.count_documents(query)
     skip = (page - 1) * limit
 
     cursor = db.properties.find(query).sort([
-        ("views_count", -1), ("favorites_count", -1), ("created_at", -1)
+        ("favorites_count", -1), ("created_at", -1)
     ]).skip(skip).limit(limit)
 
     properties = []
@@ -298,6 +347,7 @@ async def recommended_properties(
         properties=properties, total=total, page=page, limit=limit,
         total_pages=math.ceil(total / limit) if limit > 0 else 0
     )
+
 
 
 
