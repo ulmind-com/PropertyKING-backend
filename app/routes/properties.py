@@ -124,6 +124,7 @@ async def list_properties(
     city: Optional[str] = None,
     state: Optional[str] = None,
     zip_code: Optional[str] = None,
+    amenities: Optional[str] = None,
     sort_by: str = "created_at",
     sort_order: str = "desc",
     current_user: Optional[dict] = Depends(get_current_user_optional)
@@ -165,6 +166,10 @@ async def list_properties(
         query["location.state"] = state.upper()
     if zip_code:
         query["location.zip_code"] = zip_code
+    if amenities:
+        # Check if the property has ALL of the requested amenities
+        am_list = amenities.split(",")
+        query["amenities"] = {"$all": am_list}
 
     sort_field = sort_by if sort_by in ["price", "created_at", "details.total_sqft", "views_count"] else "created_at"
     sort_dir = -1 if sort_order == "desc" else 1
