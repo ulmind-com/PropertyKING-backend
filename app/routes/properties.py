@@ -372,7 +372,7 @@ async def get_property(slug: str, current_user: Optional[dict] = Depends(get_cur
 
     # Track who viewed (logged-in users only, don't track lister viewing own property)
     current_user_id = current_user["_id"] if current_user else None
-    if current_user_id and current_user_id != prop.get("listed_by"):
+    if current_user_id and str(current_user_id) != str(prop.get("listed_by")):
         await db.property_views.update_one(
             {"property_id": str(prop["_id"]), "user_id": current_user_id},
             {"$set": {
@@ -472,7 +472,7 @@ async def update_property(property_id: str, data: PropertyUpdate, current_user: 
         raise HTTPException(status_code=404, detail="Property not found")
 
     # Only owner or admin can update
-    if prop["listed_by"] != current_user["_id"] and current_user.get("role") != "admin":
+    if str(prop.get("listed_by")) != str(current_user["_id"]) and current_user.get("role") != "admin":
         raise HTTPException(status_code=403, detail="Not authorized")
 
     update_data = {}
@@ -541,7 +541,7 @@ async def get_property_viewers(
     if not prop:
         raise HTTPException(status_code=404, detail="Property not found")
 
-    if prop["listed_by"] != current_user["_id"] and current_user.get("role") != "admin":
+    if str(prop.get("listed_by")) != str(current_user["_id"]) and current_user.get("role") != "admin":
         raise HTTPException(status_code=403, detail="Not authorized to view leads")
 
     total = await db.property_views.count_documents({"property_id": property_id})

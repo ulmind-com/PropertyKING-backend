@@ -28,7 +28,7 @@ async def create_inquiry(data: InquiryCreate, current_user: dict = Depends(get_c
     if not prop:
         raise HTTPException(status_code=404, detail="Property not found")
 
-    if prop["listed_by"] == current_user["_id"]:
+    if str(prop.get("listed_by")) == str(current_user["_id"]):
         raise HTTPException(status_code=400, detail="Cannot inquire on your own property")
 
     doc = {
@@ -59,7 +59,12 @@ async def create_inquiry(data: InquiryCreate, current_user: dict = Depends(get_c
 
     # Email lister
     try:
-        lister = await db.users.find_one({"_id": ObjectId(prop["listed_by"])})
+        try:
+            lister_id_query = ObjectId(prop["listed_by"])
+        except Exception:
+            lister_id_query = prop["listed_by"]
+        
+        lister = await db.users.find_one({"_id": lister_id_query})
         if lister:
             await send_new_inquiry_email(
                 lister.get("email", ""), lister.get("full_name", ""),
@@ -124,7 +129,7 @@ async def get_received_inquiries(
 ):
     """Get inquiries received by current lister."""
     db = get_database()
-    query = {"lister_id": current_user["_id"]}
+    query = {"lister_id": {"$in": [current_user["_id"], str(current_user["_id"])]}}
     if status_filter:
         query["status"] = status_filter
 
@@ -136,7 +141,17 @@ async def get_received_inquiries(
 
     async for inq in cursor:
         prop = await db.properties.find_one({"_id": ObjectId(inq["property_id"])}) if inq.get("property_id") else None
-        user = await db.users.find_one({"_id": ObjectId(inq["user_id"])}) if inq.get("user_id") else None
+        
+        user = None
+        if inq.get("user_id"):
+            try:
+                try:
+                    uid = ObjectId(inq["user_id"])
+                except Exception:
+                    uid = inq["user_id"]
+                user = await db.users.find_one({"_id": uid})
+            except Exception:
+                pass
 
         inquiries.append(InquiryResponse(
             id=str(inq["_id"]), property_id=inq.get("property_id", ""),
@@ -166,7 +181,7 @@ async def respond_to_inquiry(inquiry_id: str, data: InquiryRespond, current_user
         raise HTTPException(status_code=400, detail="Invalid inquiry ID")
     if not inq:
         raise HTTPException(status_code=404, detail="Inquiry not found")
-    if inq["lister_id"] != current_user["_id"]:
+    if str(inq["lister_id"]) != str(current_user["_id"]):
         raise HTTPException(status_code=403, detail="Not authorized")
 
     await db.inquiries.update_one(
