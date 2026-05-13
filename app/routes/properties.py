@@ -473,6 +473,34 @@ async def create_property(data: PropertyCreate, current_user: dict = Depends(get
     return build_property_response(prop_doc)
 
 
+@router.put("/{property_id}/toggle-status")
+async def toggle_property_status(property_id: str, current_user: dict = Depends(get_current_user)):
+    """Toggle property between active and inactive. Owner only."""
+    db = get_database()
+
+    try:
+        prop = await db.properties.find_one({"_id": ObjectId(property_id)})
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid property ID")
+
+    if not prop:
+        raise HTTPException(status_code=404, detail="Property not found")
+
+    if str(prop.get("listed_by")) != str(current_user["_id"]) and current_user.get("role") != "admin":
+        raise HTTPException(status_code=403, detail="Not authorized")
+
+    current_status = prop.get("status", "active")
+    # Anything that is not "inactive" gets toggled to "inactive", and vice versa
+    new_status = "inactive" if current_status != "inactive" else "active"
+
+    await db.properties.update_one(
+        {"_id": ObjectId(property_id)},
+        {"$set": {"status": new_status, "updated_at": now_utc()}}
+    )
+
+    return {"message": f"Property is now {new_status}", "status": new_status, "success": True}
+
+
 @router.put("/{property_id}", response_model=PropertyResponse)
 async def update_property(property_id: str, data: PropertyUpdate, current_user: dict = Depends(get_current_user)):
     """Update a property listing."""
@@ -513,31 +541,6 @@ async def update_property(property_id: str, data: PropertyUpdate, current_user: 
     return build_property_response(updated)
 
 
-@router.put("/{property_id}/toggle-status")
-async def toggle_property_status(property_id: str, current_user: dict = Depends(get_current_user)):
-    """Toggle property between active and inactive. Owner only."""
-    db = get_database()
-
-    try:
-        prop = await db.properties.find_one({"_id": ObjectId(property_id)})
-    except Exception:
-        raise HTTPException(status_code=400, detail="Invalid property ID")
-
-    if not prop:
-        raise HTTPException(status_code=404, detail="Property not found")
-
-    if str(prop.get("listed_by")) != str(current_user["_id"]) and current_user.get("role") != "admin":
-        raise HTTPException(status_code=403, detail="Not authorized")
-
-    current_status = prop.get("status", "active")
-    new_status = "inactive" if current_status == "active" else "active"
-
-    await db.properties.update_one(
-        {"_id": ObjectId(property_id)},
-        {"$set": {"status": new_status, "updated_at": now_utc()}}
-    )
-
-    return {"message": f"Property is now {new_status}", "status": new_status, "success": True}
 
 
 @router.delete("/{property_id}", response_model=dict)
