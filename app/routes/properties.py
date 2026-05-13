@@ -252,19 +252,6 @@ async def my_listings(
     query = {"listed_by": {"$in": [str(current_user["_id"]), current_user["_id"]]}}
 
     total = await db.properties.count_documents(query)
-    
-    pipeline = [
-        {"$match": query},
-        {"$group": {
-            "_id": None,
-            "total_views": {"$sum": "$views_count"},
-            "total_inquiries": {"$sum": "$inquiries_count"}
-        }}
-    ]
-    agg = await db.properties.aggregate(pipeline).to_list(length=1)
-    total_views = agg[0]["total_views"] if agg else 0
-    total_inquiries = agg[0]["total_inquiries"] if agg else 0
-
     skip = (page - 1) * limit
 
     cursor = db.properties.find(query).sort("created_at", -1).skip(skip).limit(limit)
@@ -279,10 +266,33 @@ async def my_listings(
         total=total,
         page=page,
         limit=limit,
-        total_pages=math.ceil(total / limit) if limit > 0 else 0,
-        total_views=total_views,
-        total_inquiries=total_inquiries
+        total_pages=math.ceil(total / limit) if limit > 0 else 0
     )
+
+
+@router.get("/my-listings/stats")
+async def my_listings_stats(current_user: dict = Depends(get_current_user)):
+    """Get aggregate stats for current user's listings. Lightweight endpoint."""
+    db = get_database()
+    query = {"listed_by": {"$in": [str(current_user["_id"]), current_user["_id"]]}}
+
+    total = await db.properties.count_documents(query)
+
+    pipeline = [
+        {"$match": query},
+        {"$group": {
+            "_id": None,
+            "total_views": {"$sum": "$views_count"},
+            "total_inquiries": {"$sum": "$inquiries_count"}
+        }}
+    ]
+    agg = await db.properties.aggregate(pipeline).to_list(length=1)
+
+    return {
+        "total_properties": total,
+        "total_views": agg[0]["total_views"] if agg else 0,
+        "total_inquiries": agg[0]["total_inquiries"] if agg else 0
+    }
 
 
 @router.get("/top-viewed", response_model=PropertyListResponse)
