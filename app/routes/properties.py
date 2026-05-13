@@ -304,9 +304,9 @@ async def top_viewed_properties(
     exclude_ids: Optional[str] = Query(None, description="Comma-separated property IDs to exclude"),
     current_user: Optional[dict] = Depends(get_current_user_optional)
 ):
-    """Get properties sorted by most views, excluding specified IDs. Only includes properties with at least 1 view."""
+    """Get properties sorted by most views."""
     db = get_database()
-    query = {"status": "active", "views_count": {"$gt": 0}}
+    query = {"status": "active"}
 
     if exclude_ids:
         ids_to_exclude = [eid.strip() for eid in exclude_ids.split(",") if eid.strip()]
@@ -316,7 +316,8 @@ async def top_viewed_properties(
                 obj_ids.append(ObjectId(eid))
             except Exception:
                 pass
-        query["_id"] = {"$nin": obj_ids + [ObjectId(e) for e in ids_to_exclude if len(e) == 24]}
+        if obj_ids:
+            query["_id"] = {"$nin": obj_ids}
 
     total = await db.properties.count_documents(query)
     skip = (page - 1) * limit
@@ -354,7 +355,8 @@ async def recommended_properties(
                 obj_ids.append(ObjectId(eid))
             except Exception:
                 pass
-        query["_id"] = {"$nin": obj_ids + [ObjectId(e) for e in ids_to_exclude if len(e) == 24]}
+        if obj_ids:
+            query["_id"] = {"$nin": obj_ids}
 
     total = await db.properties.count_documents(query)
     skip = (page - 1) * limit
