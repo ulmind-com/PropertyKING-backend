@@ -7,6 +7,7 @@ from fastapi import APIRouter, HTTPException, status, Depends, Query
 from bson import ObjectId
 from typing import Optional, List
 import math
+import asyncio
 
 from app.database import get_database
 from app.middleware.auth import get_current_user, get_current_user_optional, require_lister
@@ -178,12 +179,10 @@ async def list_properties(
     skip = (page - 1) * limit
 
     cursor = db.properties.find(query).sort(sort_field, sort_dir).skip(skip).limit(limit)
-    properties = []
+    raw_props = await cursor.to_list(length=limit)
     current_user_id = current_user["_id"] if current_user else None
-
-    async for prop in cursor:
-        prop = await enrich_property(prop, current_user_id)
-        properties.append(build_property_response(prop))
+    enriched_props = await asyncio.gather(*(enrich_property(p, current_user_id) for p in raw_props))
+    properties = [build_property_response(p) for p in enriched_props]
 
     return PropertyListResponse(
         properties=properties,
@@ -235,10 +234,8 @@ async def nearby_properties(
     skip = (page - 1) * limit
     paged = all_results[skip:skip + limit]
 
-    properties = []
-    for prop in paged:
-        prop = await enrich_property(prop, current_user_id)
-        properties.append(build_property_response(prop))
+    enriched_paged = await asyncio.gather(*(enrich_property(p, current_user_id) for p in paged))
+    properties = [build_property_response(p) for p in enriched_paged]
 
     return PropertyListResponse(
         properties=properties, total=total, page=page, limit=limit,
