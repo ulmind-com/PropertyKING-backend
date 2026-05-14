@@ -36,16 +36,21 @@ async def enrich_property(prop: dict, current_user_id: str = None) -> dict:
     # Amenity names
     if prop.get("amenities"):
         amenity_ids = []
+        custom_amenities = []
         for aid in prop["amenities"]:
             try:
                 amenity_ids.append(ObjectId(aid))
             except Exception:
-                pass
+                custom_amenities.append(str(aid))
+        
+        names = []
         if amenity_ids:
             cursor = db.amenities.find({"_id": {"$in": amenity_ids}})
-            prop["amenity_names"] = [a["name"] async for a in cursor]
-        else:
-            prop["amenity_names"] = []
+            names = [a["name"] async for a in cursor]
+        
+        prop["amenity_names"] = names + custom_amenities
+    else:
+        prop["amenity_names"] = []
 
     # Lister info
     if prop.get("listed_by"):
