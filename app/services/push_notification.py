@@ -10,6 +10,7 @@ from app.database import get_database
 from app.utils.helpers import now_utc
 from typing import Optional, Dict, List
 import os
+import httpx
 
 # Initialize Firebase Admin (only if credentials file exists)
 _firebase_initialized = False
@@ -62,38 +63,60 @@ async def send_push_notification(
         fcm_token = user.get("fcm_token") if user else None
 
         if fcm_token:
-            try:
-                message = messaging.Message(
-                    notification=messaging.Notification(
-                        title=title,
-                        body=body
-                    ),
-                    data={
-                        "type": notification_type,
-                        **(data or {})
-                    },
-                    token=fcm_token,
-                    android=messaging.AndroidConfig(
-                        priority="high",
-                        notification=messaging.AndroidNotification(
-                            sound="default",
-                            channel_id="propertyking_channel"
-                        )
-                    ),
-                    apns=messaging.APNSConfig(
-                        payload=messaging.APNSPayload(
-                            aps=messaging.Aps(
+            if fcm_token.startswith("ExponentPushToken") or fcm_token.startswith("ExpoPushToken"):
+                # Use Expo Push API
+                try:
+                    async with httpx.AsyncClient() as client:
+                        payload = {
+                            "to": fcm_token,
+                            "title": title,
+                            "body": body,
+                            "data": { "type": notification_type, **(data or {}) },
+                            "sound": "default",
+                            "priority": "high",
+                            "channelId": "propertyking_channel"
+                        }
+                        r = await client.post("https://exp.host/--/api/v2/push/send", json=payload)
+                        if r.status_code == 200:
+                            return True
+                        else:
+                            print(f"[WARN] Expo send failed for {user_id}: {r.text}")
+                except Exception as e:
+                    print(f"[WARN] Expo send error for {user_id}: {e}")
+            elif _firebase_initialized:
+                # Use Firebase Admin SDK
+                try:
+                    message = messaging.Message(
+                        notification=messaging.Notification(
+                            title=title,
+                            body=body
+                        ),
+                        data={
+                            "type": notification_type,
+                            **(data or {})
+                        },
+                        token=fcm_token,
+                        android=messaging.AndroidConfig(
+                            priority="high",
+                            notification=messaging.AndroidNotification(
                                 sound="default",
-                                badge=1
+                                channel_id="propertyking_channel"
+                            )
+                        ),
+                        apns=messaging.APNSConfig(
+                            payload=messaging.APNSPayload(
+                                aps=messaging.Aps(
+                                    sound="default",
+                                    badge=1
+                                )
                             )
                         )
                     )
-                )
-                messaging.send(message)
-                return True
-            except Exception as e:
-                print(f"[WARN] FCM send failed for user {user_id}: {e}")
-                return False
+                    messaging.send(message)
+                    return True
+                except Exception as e:
+                    print(f"[WARN] FCM send failed for user {user_id}: {e}")
+                    return False
 
     return True  # Notification stored in DB even if FCM fails
 
