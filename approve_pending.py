@@ -32,10 +32,9 @@ client = MongoClient(mongo_uri)
 db_name = mongo_uri.split('/')[-1].split('?')[0] if '/' in mongo_uri else 'propertyking'
 db = client[db_name]
 
-# Approve the pending property
-property_id = '6a05ed8623db9185cef75d7d'
-result = db.properties.update_one(
-    {'_id': ObjectId(property_id)},
+# Approve all pending properties
+result = db.properties.update_many(
+    {'status': 'pending'},
     {'$set': {
         'status': 'active',
         'listed_at': datetime.now(timezone.utc),
@@ -43,7 +42,7 @@ result = db.properties.update_one(
     }}
 )
 
-print(f"Updated: {result.modified_count} document(s)")
+print(f"Approved: {result.modified_count} pending properties")
 
 # Also make john.smith admin
 result2 = db.users.update_one(
@@ -51,10 +50,6 @@ result2 = db.users.update_one(
     {'$set': {'role': 'admin'}}
 )
 print(f"John Smith set as admin: {result2.modified_count} document(s)")
-
-# Verify
-prop = db.properties.find_one({'_id': ObjectId(property_id)})
-print(f"\nProperty: {prop['title']} | Status: {prop['status']}")
 
 client.close()
 print("Done!")

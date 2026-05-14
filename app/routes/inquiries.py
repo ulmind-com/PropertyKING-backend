@@ -192,10 +192,11 @@ async def respond_to_inquiry(inquiry_id: str, data: InquiryRespond, current_user
         {"$set": {"response": data.response, "status": "responded", "responded_at": now_utc()}}
     )
 
-    await send_push_notification(
-        inq["user_id"], "Inquiry Response",
-        f"You received a response to your inquiry", "inquiry_response",
-        {"property_id": inq.get("property_id", "")}
-    )
+    # DISABLED: Mark Done is for the owner's personal tracking, no need to notify user
+    # await send_push_notification(
+    #     inq["user_id"], "Inquiry Response",
+    #     f"You received a response to your inquiry", "inquiry_response",
+    #     {"property_id": inq.get("property_id", "")}
+    # )
 
     return {"message": "Response sent", "success": True}
