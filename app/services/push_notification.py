@@ -77,8 +77,14 @@ async def send_push_notification(
                         "channelId": "propertyking_channel"
                     }
                     r = await client.post("https://exp.host/--/api/v2/push/send", json=payload)
+                    resp_body = r.json() if r.status_code == 200 else {}
+                    print(f"[EXPO PUSH] Status: {r.status_code}, Response: {resp_body}")
                     if r.status_code == 200:
-                        print(f"[OK] Expo push notification sent successfully to {user_id}")
+                        ticket = resp_body.get("data", {})
+                        if ticket.get("status") == "error":
+                            print(f"[ERROR] Expo push REJECTED for {user_id}: {ticket.get('message')} | Details: {ticket.get('details')}")
+                        else:
+                            print(f"[OK] Expo push ticket OK for {user_id}, ticket_id: {ticket.get('id')}")
                         return True
                     else:
                         print(f"[WARN] Expo send failed for {user_id}: {r.text}")
