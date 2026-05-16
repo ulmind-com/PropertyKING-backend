@@ -62,6 +62,7 @@ async def send_push_notification(
     fcm_token = user.get("fcm_token") if user else None
 
     if fcm_token:
+        print(f"[*] Attempting to send push notification to user {user_id} with token: {fcm_token}")
         if fcm_token.startswith("ExponentPushToken") or fcm_token.startswith("ExpoPushToken"):
             # Use Expo Push API (does not require Firebase to be initialized)
             try:
@@ -77,6 +78,7 @@ async def send_push_notification(
                     }
                     r = await client.post("https://exp.host/--/api/v2/push/send", json=payload)
                     if r.status_code == 200:
+                        print(f"[OK] Expo push notification sent successfully to {user_id}")
                         return True
                     else:
                         print(f"[WARN] Expo send failed for {user_id}: {r.text}")
@@ -112,10 +114,13 @@ async def send_push_notification(
                     )
                 )
                 messaging.send(message)
+                print(f"[OK] FCM push notification sent successfully to {user_id}")
                 return True
             except Exception as e:
-                print(f"[WARN] FCM send failed for user {user_id}: {e}")
+                print(f"[WARN] FCM send failed for {user_id}: {e}")
                 return False
+    else:
+        print(f"[WARN] No fcm_token found for user {user_id}. Cannot send push notification.")
 
     return True  # Notification stored in DB even if FCM fails
 
