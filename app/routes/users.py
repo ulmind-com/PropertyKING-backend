@@ -78,6 +78,26 @@ async def update_fcm_token(data: FCMTokenUpdate, current_user: dict = Depends(ge
     return MessageResponse(message="FCM token updated")
 
 
+@router.delete("/me", response_model=MessageResponse)
+async def delete_my_account(current_user: dict = Depends(get_current_user)):
+    """Permanently delete user account and all associated data."""
+    db = get_database()
+    uid = current_user["_id"]
+    uid_str = str(uid)
+    
+    # Cascade delete all user data
+    await db.properties.delete_many({"listed_by": {"$in": [uid_str, uid]}})
+    await db.favorites.delete_many({"user_id": uid})
+    await db.inquiries.delete_many({"user_id": uid})
+    await db.inquiries.delete_many({"lister_id": {"$in": [uid_str, uid]}})
+    await db.notifications.delete_many({"user_id": uid})
+    
+    # Delete the user record
+    await db.users.delete_one({"_id": uid})
+    
+    return MessageResponse(message="Account and all associated data permanently deleted.")
+
+
 @router.get("/{user_id}/public", response_model=UserPublicProfile)
 async def get_public_profile(user_id: str):
     db = get_database()
