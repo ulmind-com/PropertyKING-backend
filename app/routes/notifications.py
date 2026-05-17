@@ -56,3 +56,22 @@ async def mark_all_read(current_user: dict = Depends(get_current_user)):
         {"user_id": current_user["_id"], "is_read": False},
         {"$set": {"is_read": True}})
     return {"message": "All marked as read", "success": True}
+
+
+@router.delete("/{notification_id}")
+async def delete_notification(notification_id: str, current_user: dict = Depends(get_current_user)):
+    """Delete a specific notification."""
+    db = get_database()
+    result = await db.notifications.delete_one({"_id": ObjectId(notification_id), "user_id": current_user["_id"]})
+    if result.deleted_count == 0:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="Notification not found")
+    return {"message": "Notification deleted", "success": True}
+
+
+@router.delete("")
+async def delete_all_notifications(current_user: dict = Depends(get_current_user)):
+    """Delete all notifications for the user."""
+    db = get_database()
+    await db.notifications.delete_many({"user_id": current_user["_id"]})
+    return {"message": "All notifications deleted", "success": True}
