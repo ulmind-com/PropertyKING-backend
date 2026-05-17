@@ -10,6 +10,7 @@ from app.database import get_database
 from app.models.user import (
     UserRegister, UserLogin, GoogleAuthRequest,
     ForgotPasswordRequest, ResetPasswordRequest, RefreshTokenRequest,
+    OTPRequest, OTPVerify,
     AuthResponse, UserResponse, MessageResponse
 )
 from app.middleware.auth import (
@@ -17,10 +18,12 @@ from app.middleware.auth import (
     create_access_token, create_refresh_token, create_reset_token,
     decode_token
 )
-from app.services.email_service import send_welcome_email, send_password_reset_email
+from app.services.email_service import send_welcome_email, send_password_reset_email, send_otp_email
 from app.utils.helpers import now_utc, serialize_doc
 
 import httpx
+import random
+from datetime import timedelta
 
 router = APIRouter(prefix="/auth", tags=["Authentication"])
 
@@ -45,6 +48,73 @@ def build_user_response(user: dict) -> UserResponse:
     )
 
 
+@router.post("/request-otp", response_model=MessageResponse)
+async def request_otp(data: OTPRequest):
+    """Request an OTP for registration or password reset."""
+    db = get_database()
+    
+    # Check if email exists for registration
+    existing = await db.users.find_one({"email": data.email.lower()})
+    if data.purpose == "registration" and existing:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Email already registered"
+        )
+    if data.purpose == "reset" and not existing:
+        # Always return success to prevent email enumeration, but we won't send the email
+        return MessageResponse(message="If the email exists, an OTP has been sent.")
+
+    # Generate 6-digit OTP
+    otp = str(random.randint(100000, 999999))
+    
+    # Store OTP in DB
+    await db.otps.delete_many({"email": data.email.lower(), "purpose": data.purpose})
+    await db.otps.insert_one({
+        "email": data.email.lower(),
+        "otp": otp,
+        "purpose": data.purpose,
+        "verified": False,
+        "expires_at": now_utc() + timedelta(minutes=10)
+    })
+    
+    # Send email
+    await send_otp_email(data.email.lower(), otp, data.purpose)
+    
+    return MessageResponse(message="OTP sent successfully")
+
+
+@router.post("/verify-otp", response_model=MessageResponse)
+async def verify_otp(data: OTPVerify):
+    """Verify an OTP."""
+    db = get_database()
+    
+    otp_doc = await db.otps.find_one({
+        "email": data.email.lower(),
+        "otp": data.otp,
+        "purpose": data.purpose
+    })
+    
+    if not otp_doc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid OTP"
+        )
+        
+    if now_utc() > otp_doc["expires_at"]:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="OTP has expired"
+        )
+        
+    # Mark as verified
+    await db.otps.update_one(
+        {"_id": otp_doc["_id"]},
+        {"$set": {"verified": True}}
+    )
+    
+    return MessageResponse(message="OTP verified successfully")
+
+
 @router.post("/register", response_model=AuthResponse, status_code=status.HTTP_201_CREATED)
 async def register(data: UserRegister):
     """Register a new user."""
@@ -58,6 +128,19 @@ async def register(data: UserRegister):
             detail="Email already registered"
         )
 
+
+    # Check if OTP was verified
+    otp_doc = await db.otps.find_one({
+        "email": data.email.lower(),
+        "purpose": "registration",
+        "verified": True
+    })
+    
+    if not otp_doc:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email not verified. Please request and verify OTP first."
+        )
 
     # Create user document
     user_doc = {
@@ -82,6 +165,9 @@ async def register(data: UserRegister):
 
     result = await db.users.insert_one(user_doc)
     user_doc["_id"] = result.inserted_id
+
+    # Clean up verified OTP
+    await db.otps.delete_one({"_id": otp_doc["_id"]})
 
     # Generate tokens
     user_id = str(result.inserted_id)
@@ -228,36 +314,27 @@ async def google_auth(data: GoogleAuthRequest):
     )
 
 
-@router.post("/forgot-password", response_model=MessageResponse)
-async def forgot_password(data: ForgotPasswordRequest):
-    """Send password reset email."""
-    db = get_database()
-    user = await db.users.find_one({"email": data.email.lower()})
-
-    if user:
-        reset_token = create_reset_token(data.email.lower())
-        await send_password_reset_email(data.email, user.get("full_name", ""), reset_token)
-
-    # Always return success to prevent email enumeration
-    return MessageResponse(message="If the email exists, a reset link has been sent.")
-
-
 @router.post("/reset-password", response_model=MessageResponse)
 async def reset_password(data: ResetPasswordRequest):
-    """Reset password using reset token."""
-    payload = decode_token(data.token)
-
-    if payload.get("type") != "reset":
+    """Reset password using verified OTP."""
+    db = get_database()
+    
+    # Check if OTP was verified
+    otp_doc = await db.otps.find_one({
+        "email": data.email.lower(),
+        "otp": data.otp,
+        "purpose": "reset",
+        "verified": True
+    })
+    
+    if not otp_doc:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid reset token"
+            detail="Invalid or unverified OTP."
         )
 
-    email = payload.get("sub")
-    db = get_database()
-
     result = await db.users.update_one(
-        {"email": email},
+        {"email": data.email.lower()},
         {"$set": {
             "password_hash": hash_password(data.new_password),
             "updated_at": now_utc()
@@ -269,6 +346,9 @@ async def reset_password(data: ResetPasswordRequest):
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User not found"
         )
+        
+    # Clean up OTP
+    await db.otps.delete_one({"_id": otp_doc["_id"]})
 
     return MessageResponse(message="Password reset successfully")
 

@@ -141,3 +141,24 @@ async def send_new_inquiry_email(email: str, name: str, property_title: str, inq
     </div>
     """
     return await send_email(email, f"New Inquiry: {property_title}", html)
+
+
+async def send_otp_email(email: str, otp: str, purpose: str = "Verification") -> bool:
+    """Send OTP for verification (Registration or Password Reset)."""
+    title = "Verify Your Email" if purpose == "registration" else "Password Reset OTP"
+    html = f"""
+    <div style="font-family: 'Inter', Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <div style="background: linear-gradient(135deg, #2563EB, #1E40AF); padding: 30px; text-align: center; border-radius: 12px 12px 0 0;">
+            <h1 style="color: white; margin: 0;">🏠 PropertyKING</h1>
+        </div>
+        <div style="padding: 30px; background: white; text-align: center;">
+            <h2 style="color: #0f172a; margin-top: 0;">{title}</h2>
+            <p style="color: #475569;">Please use the following OTP to complete your {purpose}.</p>
+            <div style="background: #f1f5f9; padding: 20px; margin: 24px 0; border-radius: 8px; letter-spacing: 4px;">
+                <h1 style="color: #0f172a; margin: 0; font-size: 32px;">{otp}</h1>
+            </div>
+            <p style="color: #94a3b8; font-size: 13px;">This OTP will expire in 10 minutes. Do not share it with anyone.</p>
+        </div>
+    </div>
+    """
+    return await send_email(email, f"{title} - PropertyKING", html)
