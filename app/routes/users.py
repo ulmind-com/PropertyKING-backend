@@ -15,7 +15,7 @@ from app.utils.helpers import now_utc
 router = APIRouter(prefix="/users", tags=["Users"])
 
 
-def build_user_resp(user: dict, favorites_count=0, listings_count=0, reviews_count=0) -> UserResponse:
+def build_user_resp(user: dict, favorites_count=0, listings_count=0, leads_count=0) -> UserResponse:
     uid = user["_id"] if isinstance(user["_id"], str) else str(user["_id"])
     return UserResponse(
         id=uid, full_name=user.get("full_name", ""), email=user.get("email", ""),
@@ -23,7 +23,7 @@ def build_user_resp(user: dict, favorites_count=0, listings_count=0, reviews_cou
         lister_type=user.get("lister_type"), license_number=user.get("license_number"),
         company_name=user.get("company_name"), bio=user.get("bio"),
         verified=user.get("verified", False), location=user.get("location"),
-        favorites_count=favorites_count, listings_count=listings_count, reviews_count=reviews_count,
+        favorites_count=favorites_count, listings_count=listings_count, leads_count=leads_count,
         is_active=user.get("is_active", True), created_at=user.get("created_at"))
 
 
@@ -32,8 +32,8 @@ async def get_my_profile(current_user: dict = Depends(get_current_user)):
     db = get_database()
     fav_count = await db.favorites.count_documents({"user_id": current_user["_id"]})
     list_count = await db.properties.count_documents({"listed_by": {"$in": [str(current_user["_id"]), current_user["_id"]]}})
-    rev_count = await db.reviews.count_documents({"user_id": current_user["_id"]})
-    return build_user_resp(current_user, fav_count, list_count, rev_count)
+    leads_count = await db.inquiries.count_documents({"lister_id": {"$in": [str(current_user["_id"]), current_user["_id"]]}})
+    return build_user_resp(current_user, fav_count, list_count, leads_count)
 
 
 @router.put("/me", response_model=UserResponse)
@@ -49,8 +49,8 @@ async def update_my_profile(data: UserProfileUpdate, current_user: dict = Depend
     updated["_id"] = str(updated["_id"])
     fav_count = await db.favorites.count_documents({"user_id": current_user["_id"]})
     list_count = await db.properties.count_documents({"listed_by": {"$in": [str(current_user["_id"]), current_user["_id"]]}})
-    rev_count = await db.reviews.count_documents({"user_id": current_user["_id"]})
-    return build_user_resp(updated, fav_count, list_count, rev_count)
+    leads_count = await db.inquiries.count_documents({"lister_id": {"$in": [str(current_user["_id"]), current_user["_id"]]}})
+    return build_user_resp(updated, fav_count, list_count, leads_count)
 
 
 @router.put("/me/avatar", response_model=UserResponse)
@@ -65,8 +65,8 @@ async def update_avatar(file: UploadFile = File(...), current_user: dict = Depen
     
     fav_count = await db.favorites.count_documents({"user_id": current_user["_id"]})
     list_count = await db.properties.count_documents({"listed_by": {"$in": [str(current_user["_id"]), current_user["_id"]]}})
-    rev_count = await db.reviews.count_documents({"user_id": current_user["_id"]})
-    return build_user_resp(updated, fav_count, list_count, rev_count)
+    leads_count = await db.inquiries.count_documents({"lister_id": {"$in": [str(current_user["_id"]), current_user["_id"]]}})
+    return build_user_resp(updated, fav_count, list_count, leads_count)
 
 
 @router.put("/me/fcm-token", response_model=MessageResponse)
