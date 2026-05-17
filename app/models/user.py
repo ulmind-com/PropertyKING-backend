@@ -106,6 +106,7 @@ class UserResponse(BaseModel):
     location: Optional[UserLocation] = None
     favorites_count: int = 0
     listings_count: int = 0
+    reviews_count: int = 0
     is_active: bool = True
     created_at: Optional[datetime] = None
 
