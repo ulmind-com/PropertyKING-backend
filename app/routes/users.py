@@ -86,16 +86,16 @@ async def delete_my_account(current_user: dict = Depends(get_current_user)):
     uid_str = str(uid)
     
     # Cascade delete all user data
-    await db.properties.delete_many({"listed_by": {"$in": [uid_str, uid]}})
-    await db.favorites.delete_many({"user_id": uid})
-    await db.inquiries.delete_many({"user_id": uid})
-    await db.inquiries.delete_many({"lister_id": {"$in": [uid_str, uid]}})
-    await db.notifications.delete_many({"user_id": uid})
+    await db.properties.delete_many({"listed_by": {"$in": [uid_str, uid, ObjectId(uid_str)]}})
+    await db.favorites.delete_many({"user_id": {"$in": [uid_str, uid, ObjectId(uid_str)]}})
+    await db.inquiries.delete_many({"user_id": {"$in": [uid_str, uid, ObjectId(uid_str)]}})
+    await db.inquiries.delete_many({"lister_id": {"$in": [uid_str, uid, ObjectId(uid_str)]}})
+    await db.notifications.delete_many({"user_id": {"$in": [uid_str, uid, ObjectId(uid_str)]}})
     
-    # Delete the user record
-    await db.users.delete_one({"_id": uid})
+    # Delete the user record (handling both ObjectId and String formats just in case)
+    await db.users.delete_one({"_id": {"$in": [ObjectId(uid_str), uid_str, uid]}})
     
-    return MessageResponse(message="Account and all associated data permanently deleted.")
+    return MessageResponse(message="Account and all associated data permanently deleted.", success=True)
 
 
 @router.get("/{user_id}/public", response_model=UserPublicProfile)
