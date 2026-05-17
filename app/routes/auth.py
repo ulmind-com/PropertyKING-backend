@@ -100,7 +100,12 @@ async def verify_otp(data: OTPVerify):
             detail="Invalid OTP"
         )
         
-    if now_utc() > otp_doc["expires_at"]:
+    expires_at = otp_doc["expires_at"]
+    if expires_at.tzinfo is None:
+        from datetime import timezone
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+        
+    if now_utc() > expires_at:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="OTP has expired"
