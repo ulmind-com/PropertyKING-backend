@@ -12,6 +12,9 @@ from app.database import get_database
 from app.middleware.auth import require_admin
 from app.models.property import PropertyReject
 from app.models.notification import BroadcastNotification
+from pydantic import BaseModel
+import httpx
+import os
 from app.services.push_notification import send_push_notification, broadcast_notification
 from app.services.email_service import send_property_approved_email, send_property_rejected_email
 from app.utils.helpers import now_utc
@@ -293,3 +296,50 @@ async def send_broadcast(data: BroadcastNotification, admin: dict = Depends(requ
     count = await broadcast_notification(
         data.title, data.body, data.type, data.data, data.target_roles, data.target_states)
     return {"message": f"Notification sent to {count} users", "recipients": count, "success": True}
+
+
+class AIGenerateRequest(BaseModel):
+    prompt: str
+    tone: Optional[str] = "professional"
+    type: Optional[str] = "system"
+
+@router.post("/notifications/generate")
+async def generate_notification_ai(data: AIGenerateRequest, admin: dict = Depends(require_admin)):
+    """Generate a push notification using OpenRouter AI."""
+    api_key = os.getenv("OPENROUTER_API_KEY")
+    if not api_key:
+        raise HTTPException(status_code=500, detail="OpenRouter API key not configured")
+    
+    system_prompt = f"You are a marketing expert for PropertyKING, a premium real estate app. Write a short, engaging push notification. Tone: {data.tone}. Type: {data.type}. The notification should have a 'title' (max 50 chars) and a 'body' (max 150 chars). Return ONLY a valid JSON object in this format: {{\"title\": \"...\", \"body\": \"...\"}}. Do not include any markdown formatting or other text."
+    
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.post(
+                "https://openrouter.ai/api/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {api_key}",
+                    "Content-Type": "application/json",
+                    "HTTP-Referer": "https://propertyking.com",
+                    "X-Title": "PropertyKING Admin"
+                },
+                json={
+                    "model": "google/gemini-2.5-flash",
+                    "messages": [
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": data.prompt}
+                    ],
+                    "response_format": {"type": "json_object"}
+                },
+                timeout=15.0
+            )
+            response.raise_for_status()
+            result = response.json()
+            content = result["choices"][0]["message"]["content"]
+            
+            import json
+            parsed = json.loads(content)
+            return {"title": parsed.get("title", ""), "body": parsed.get("body", ""), "success": True}
+        except Exception as e:
+            print("AI Generate Error:", str(e))
+            raise HTTPException(status_code=500, detail="Failed to generate AI content. Please try again.")
+
