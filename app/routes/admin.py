@@ -83,7 +83,7 @@ async def admin_dashboard(admin: dict = Depends(require_admin)):
 
 @router.get("/properties")
 async def admin_list_properties(
-    page: int = Query(1, ge=1), limit: int = Query(20, ge=1, le=100),
+    page: int = Query(1, ge=1), limit: int = Query(10, ge=1, le=100),
     status_filter: Optional[str] = Query(None, alias="status"),
     search: Optional[str] = None,
     admin: dict = Depends(require_admin)
@@ -214,7 +214,7 @@ async def reject_property(property_id: str, data: PropertyReject, admin: dict = 
 
 @router.get("/users")
 async def admin_list_users(
-    page: int = Query(1, ge=1), limit: int = Query(20, ge=1, le=100),
+    page: int = Query(1, ge=1), limit: int = Query(10, ge=1, le=100),
     role: Optional[str] = None, search: Optional[str] = None,
     admin: dict = Depends(require_admin)
 ):

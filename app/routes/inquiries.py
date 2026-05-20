@@ -85,7 +85,7 @@ async def create_inquiry(data: InquiryCreate, current_user: dict = Depends(get_c
 
 @router.get("/sent")
 async def get_sent_inquiries(
-    page: int = Query(1, ge=1), limit: int = Query(20, ge=1, le=100),
+    page: int = Query(1, ge=1), limit: int = Query(10, ge=1, le=100),
     current_user: dict = Depends(get_current_user)
 ):
     """Get inquiries sent by current user."""
@@ -125,7 +125,7 @@ async def get_sent_inquiries(
 
 @router.get("/received")
 async def get_received_inquiries(
-    page: int = Query(1, ge=1), limit: int = Query(20, ge=1, le=100),
+    page: int = Query(1, ge=1), limit: int = Query(10, ge=1, le=100),
     status_filter: str = Query(None, alias="status"),
     current_user: dict = Depends(get_current_user)
 ):
