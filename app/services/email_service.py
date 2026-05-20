@@ -123,6 +123,27 @@ async def send_property_rejected_email(email: str, name: str, property_title: st
     return await send_email(email, f"Property Listing Update Required: {property_title}", html)
 
 
+async def send_property_deleted_email(email: str, name: str, property_title: str, reason: str) -> bool:
+    """Send email when property listing is permanently deleted by admin."""
+    html = f"""
+    <div style="font-family: 'Inter', Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <div style="background: linear-gradient(135deg, #ef4444, #991b1b); padding: 30px; text-align: center; border-radius: 12px 12px 0 0;">
+            <h1 style="color: white; margin: 0;">🗑️ Property Listing Deleted</h1>
+        </div>
+        <div style="padding: 30px; background: white;">
+            <h2 style="color: #0f172a; margin-top: 0;">Hi {name},</h2>
+            <p style="color: #475569;">Your property listing <strong>"{property_title}"</strong> has been deleted by an administrator.</p>
+            <div style="background: #fef2f2; border-left: 4px solid #ef4444; padding: 16px; margin: 16px 0; border-radius: 4px;">
+                <strong style="color: #991b1b;">Reason for Deletion:</strong>
+                <p style="color: #7f1d1d; margin: 8px 0 0;">{reason}</p>
+            </div>
+            <p style="color: #475569;">If you believe this was a mistake, please contact support.</p>
+        </div>
+    </div>
+    """
+    return await send_email(email, f"Property Deleted: {property_title}", html)
+
+
 async def send_new_inquiry_email(email: str, name: str, property_title: str, inquirer_name: str, message: str) -> bool:
     """Send email when someone inquires about a property."""
     html = f"""

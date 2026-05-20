@@ -16,7 +16,7 @@ from pydantic import BaseModel
 import httpx
 import os
 from app.services.push_notification import send_push_notification, broadcast_notification
-from app.services.email_service import send_property_approved_email, send_property_rejected_email
+from app.services.email_service import send_property_approved_email, send_property_rejected_email, send_property_deleted_email
 from app.utils.helpers import now_utc
 
 router = APIRouter(prefix="/admin", tags=["Admin"])
@@ -233,7 +233,36 @@ async def reject_property(property_id: str, data: PropertyReject, admin: dict = 
     except Exception:
         pass
 
-    return {"message": "Property rejected", "success": True}
+    return {"message": "Property rejected successfully", "property_id": property_id}
+
+
+@router.delete("/properties/{property_id}")
+async def delete_property(
+    property_id: str, 
+    reason: str = Query(..., min_length=10),
+    admin: dict = Depends(require_admin)
+):
+    """Admin endpoint to permanently delete a property."""
+    db = get_database()
+    try:
+        prop = await db.properties.find_one({"_id": ObjectId(property_id)})
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid property ID")
+    
+    if not prop:
+        raise HTTPException(status_code=404, detail="Property not found")
+        
+    # Delete the property
+    await db.properties.delete_one({"_id": ObjectId(property_id)})
+    
+    # Send email to lister if lister_id exists
+    lister_id = prop.get("lister_id")
+    if lister_id:
+        lister = await db.users.find_one({"_id": ObjectId(lister_id)})
+        if lister and lister.get("email"):
+            await send_property_deleted_email(lister["email"], lister.get("full_name", ""), prop.get("title", ""), reason)
+            
+    return {"message": "Property deleted successfully", "property_id": property_id, "success": True}
 
 
 @router.get("/users")
