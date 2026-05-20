@@ -149,7 +149,7 @@ class PropertyApprove(BaseModel):
 
 
 class PropertyReject(BaseModel):
-    reason: str = Field(..., min_length=10, max_length=500)
+    reason: str = Field(..., min_length=1, max_length=500)
 
 
 # ─── Query Models ───

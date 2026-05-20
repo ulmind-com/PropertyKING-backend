@@ -304,7 +304,7 @@ async def reject_property(property_id: str, data: PropertyReject, admin: dict = 
 @router.delete("/properties/{property_id}")
 async def delete_property(
     property_id: str, 
-    reason: str = Query(..., min_length=10),
+    reason: str = Query(..., min_length=1),
     admin: dict = Depends(require_admin)
 ):
     """Admin endpoint to permanently delete a property."""
