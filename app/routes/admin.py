@@ -290,6 +290,24 @@ async def toggle_user_status(user_id: str, admin: dict = Depends(require_admin))
     return {"message": f"User {'activated' if new_status else 'deactivated'}", "is_active": new_status, "success": True}
 
 
+@router.put("/users/{user_id}/make-admin")
+async def make_user_admin(user_id: str, admin: dict = Depends(require_admin)):
+    """Make a regular user an admin."""
+    db = get_database()
+    try:
+        user = await db.users.find_one({"_id": ObjectId(user_id)})
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid user ID")
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    if user.get("role") == "admin":
+        raise HTTPException(status_code=400, detail="User is already an admin")
+
+    await db.users.update_one({"_id": ObjectId(user_id)}, {"$set": {"role": "admin", "updated_at": now_utc()}})
+    return {"message": "User is now an admin", "role": "admin", "success": True}
+
+
 @router.post("/notifications/broadcast")
 async def send_broadcast(data: BroadcastNotification, admin: dict = Depends(require_admin)):
     """Broadcast notification to users."""
