@@ -204,6 +204,7 @@ async def admin_list_properties(
             "admin_review": prop.get("admin_review"),
             "video_url": prop.get("video_url"),
             "floor_plan_url": prop.get("floor_plan_url"),
+            "floor_plan_urls": prop.get("floor_plan_urls", []),
         })
 
     return {"properties": properties, "total": total, "page": page, "limit": limit,
