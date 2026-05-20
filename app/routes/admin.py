@@ -290,8 +290,6 @@ async def toggle_user_status(user_id: str, admin: dict = Depends(require_admin))
 @router.post("/notifications/broadcast")
 async def send_broadcast(data: BroadcastNotification, admin: dict = Depends(require_admin)):
     """Broadcast notification to users."""
-    # DISABLED: As per request
-    # count = await broadcast_notification(
-    #     data.title, data.body, data.type, data.data, data.target_roles, data.target_states)
-    count = 0
+    count = await broadcast_notification(
+        data.title, data.body, data.type, data.data, data.target_roles, data.target_states)
     return {"message": f"Notification sent to {count} users", "recipients": count, "success": True}
