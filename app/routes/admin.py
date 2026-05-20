@@ -104,7 +104,7 @@ async def admin_list_properties(
 
     total = await db.properties.count_documents(query)
     skip = (page - 1) * limit
-    cursor = db.properties.find(query).sort("created_at", -1).skip(skip).limit(limit)
+    cursor = db.properties.find(query).sort("updated_at", -1).skip(skip).limit(limit)
 
     properties = []
     async for prop in cursor:
