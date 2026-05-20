@@ -147,6 +147,27 @@ async def admin_list_properties(
             "total_pages": math.ceil(total / limit) if limit > 0 else 0}
 
 
+@router.get("/properties/count")
+async def admin_count_properties(
+    status_filter: Optional[str] = Query(None, alias="status"),
+    search: Optional[str] = None,
+    admin: dict = Depends(require_admin)
+):
+    """Get total count of properties for fast loading."""
+    db = get_database()
+    query = {}
+    if status_filter:
+        query["status"] = status_filter
+    if search:
+        query["$or"] = [
+            {"title": {"$regex": search, "$options": "i"}},
+            {"location.city": {"$regex": search, "$options": "i"}}
+        ]
+    total = await db.properties.count_documents(query)
+    return {"total": total}
+
+
+
 @router.put("/properties/{property_id}/approve")
 async def approve_property(property_id: str, admin: dict = Depends(require_admin)):
     """Approve a pending property listing."""
