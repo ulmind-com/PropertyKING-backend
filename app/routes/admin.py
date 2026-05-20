@@ -323,7 +323,7 @@ async def generate_notification_ai(data: AIGenerateRequest, admin: dict = Depend
                     "X-Title": "PropertyKING Admin"
                 },
                 json={
-                    "model": "meta-llama/llama-3.3-70b-instruct:free",
+                    "model": "openrouter/auto",
                     "messages": [
                         {"role": "system", "content": system_prompt},
                         {"role": "user", "content": data.prompt}
