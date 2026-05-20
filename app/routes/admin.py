@@ -250,16 +250,18 @@ async def approve_property(property_id: str, admin: dict = Depends(require_admin
         }})
 
     # Notify lister
-    await send_push_notification(prop["listed_by"], "Listing Approved! ✅",
-        f"Your property '{prop.get('title', '')}' is now live!", "property_approved",
-        {"property_id": property_id})
+    lister_id = prop.get("listed_by") or prop.get("lister_id")
+    if lister_id:
+        await send_push_notification(lister_id, "Listing Approved! ✅",
+            f"Your property '{prop.get('title', '')}' is now live!", "property_approved",
+            {"property_id": property_id})
 
-    try:
-        lister = await db.users.find_one({"_id": ObjectId(prop["listed_by"])})
-        if lister:
-            await send_property_approved_email(lister["email"], lister["full_name"], prop.get("title", ""))
-    except Exception:
-        pass
+        try:
+            lister = await db.users.find_one({"_id": ObjectId(lister_id)})
+            if lister:
+                await send_property_approved_email(lister["email"], lister["full_name"], prop.get("title", ""))
+        except Exception:
+            pass
 
     return {"message": "Property approved", "success": True}
 
@@ -282,16 +284,18 @@ async def reject_property(property_id: str, data: PropertyReject, admin: dict = 
             "admin_review": {"reviewed_by": admin["_id"], "reviewed_at": now_utc(), "rejection_reason": data.reason}
         }})
 
-    await send_push_notification(prop["listed_by"], "Listing Needs Changes",
-        f"Your property '{prop.get('title', '')}' was not approved.", "property_rejected",
-        {"property_id": property_id})
+    lister_id = prop.get("listed_by") or prop.get("lister_id")
+    if lister_id:
+        await send_push_notification(lister_id, "Listing Needs Changes",
+            f"Your property '{prop.get('title', '')}' was not approved.", "property_rejected",
+            {"property_id": property_id})
 
-    try:
-        lister = await db.users.find_one({"_id": ObjectId(prop["listed_by"])})
-        if lister:
-            await send_property_rejected_email(lister["email"], lister["full_name"], prop.get("title", ""), data.reason)
-    except Exception:
-        pass
+        try:
+            lister = await db.users.find_one({"_id": ObjectId(lister_id)})
+            if lister:
+                await send_property_rejected_email(lister["email"], lister["full_name"], prop.get("title", ""), data.reason)
+        except Exception:
+            pass
 
     return {"message": "Property rejected successfully", "property_id": property_id}
 
@@ -315,12 +319,15 @@ async def delete_property(
     # Delete the property
     await db.properties.delete_one({"_id": ObjectId(property_id)})
     
-    # Send email to lister if lister_id exists
-    lister_id = prop.get("lister_id")
+    # Send email to lister
+    lister_id = prop.get("listed_by") or prop.get("lister_id")
     if lister_id:
-        lister = await db.users.find_one({"_id": ObjectId(lister_id)})
-        if lister and lister.get("email"):
-            await send_property_deleted_email(lister["email"], lister.get("full_name", ""), prop.get("title", ""), reason)
+        try:
+            lister = await db.users.find_one({"_id": ObjectId(lister_id)})
+            if lister and lister.get("email"):
+                await send_property_deleted_email(lister["email"], lister.get("full_name", ""), prop.get("title", ""), reason)
+        except Exception:
+            pass
             
     return {"message": "Property deleted successfully", "property_id": property_id, "success": True}
 
