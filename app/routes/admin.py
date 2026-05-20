@@ -109,9 +109,10 @@ async def admin_list_properties(
     properties = []
     async for prop in cursor:
         lister = None
-        if prop.get("listed_by"):
+        lister_id = prop.get("listed_by") or prop.get("lister_id")
+        if lister_id:
             try:
-                lister = await db.users.find_one({"_id": ObjectId(prop["listed_by"])})
+                lister = await db.users.find_one({"_id": ObjectId(lister_id)})
             except Exception:
                 pass
         pt = None
@@ -121,34 +122,88 @@ async def admin_list_properties(
             except Exception:
                 pass
 
+        # Handle images (can be list of dicts or list of strings)
+        all_images = []
         primary_img = None
         for img in prop.get("images", []):
-            if isinstance(img, dict) and img.get("is_primary"):
-                primary_img = img.get("url")
-                break
+            if isinstance(img, dict):
+                all_images.append(img.get("url"))
+                if img.get("is_primary"):
+                    primary_img = img.get("url")
             elif isinstance(img, str):
-                primary_img = img
-                break
+                all_images.append(img)
 
-        if not primary_img and prop.get("images"):
-            first_img = prop["images"][0]
-            primary_img = first_img.get("url") if isinstance(first_img, dict) else first_img
+        if not primary_img and all_images:
+            primary_img = all_images[0]
+
+        # Extract location (handle both flat and nested)
+        loc = prop.get("location", {})
+        city = loc.get("city", "") if isinstance(loc, dict) else ""
+        state = loc.get("state", "") if isinstance(loc, dict) else ""
+        address = loc.get("address", "") if isinstance(loc, dict) else ""
+        zip_code = loc.get("zip_code", "") if isinstance(loc, dict) else ""
+        # Flat fields fallback
+        if not city:
+            city = prop.get("city", "")
+        if not state:
+            state = prop.get("state", "")
+        if not address:
+            address = prop.get("address", "")
+        if not zip_code:
+            zip_code = prop.get("zip_code", "")
+
+        # Coordinates
+        coords = loc.get("coordinates", {}) if isinstance(loc, dict) else {}
+        lat = None
+        lng = None
+        if isinstance(coords, dict) and coords.get("coordinates"):
+            c = coords["coordinates"]
+            lng, lat = c[0], c[1]
+        if lat is None:
+            lat = prop.get("latitude")
+        if lng is None:
+            lng = prop.get("longitude")
+
+        # Details (nested or flat)
+        details = prop.get("details", {}) or {}
+        bedrooms = details.get("bedrooms") or prop.get("bedrooms")
+        bathrooms = details.get("bathrooms") or prop.get("bathrooms")
+        area = details.get("total_sqft") or prop.get("area_sqft")
+        year_built = details.get("year_built") or prop.get("year_built")
+        stories = details.get("stories")
+        garage = details.get("garage_spaces")
+        heating = details.get("heating")
+        cooling = details.get("cooling")
 
         properties.append({
             "id": str(prop["_id"]), "title": prop.get("title", ""), "slug": prop.get("slug", ""),
+            "description": prop.get("description", ""),
             "status": prop.get("status", ""), "price": prop.get("price", 0),
+            "currency": prop.get("currency", "USD"),
             "listing_type": prop.get("listing_type", ""),
-            "property_type": pt.get("name") if pt else None,
-            "city": prop.get("location", {}).get("city", ""),
-            "state": prop.get("location", {}).get("state", ""),
+            "property_type": pt.get("name") if pt else (prop.get("property_type_name") or prop.get("property_type")),
+            "city": city, "state": state, "address": address, "zip_code": zip_code,
+            "country": prop.get("country", ""),
+            "latitude": lat, "longitude": lng,
+            "bedrooms": bedrooms, "bathrooms": bathrooms, "area_sqft": area,
+            "year_built": year_built, "stories": stories, "garage_spaces": garage,
+            "heating": heating, "cooling": cooling,
+            "amenities": prop.get("amenities", []),
             "image": primary_img,
-            "lister_name": lister.get("full_name") if lister else None,
-            "lister_email": lister.get("email") if lister else None,
-            "views": prop.get("views_count", 0),
-            "favorites": prop.get("favorites_count", 0),
-            "inquiries": prop.get("inquiries_count", 0),
+            "images": all_images,
+            "lister_name": lister.get("full_name") if lister else (prop.get("lister_name") or None),
+            "lister_email": lister.get("email") if lister else (prop.get("contact_email") or None),
+            "lister_phone": lister.get("phone") if lister else (prop.get("contact_phone") or None),
+            "lister_avatar": lister.get("avatar") if lister else None,
+            "views": prop.get("views_count", 0) or prop.get("views", 0),
+            "favorites": prop.get("favorites_count", 0) or prop.get("favorites", 0),
+            "inquiries": prop.get("inquiries_count", 0) or prop.get("inquiries", 0),
             "created_at": prop.get("created_at"),
-            "admin_review": prop.get("admin_review")
+            "updated_at": prop.get("updated_at"),
+            "listed_at": prop.get("listed_at"),
+            "admin_review": prop.get("admin_review"),
+            "video_url": prop.get("video_url"),
+            "floor_plan_url": prop.get("floor_plan_url"),
         })
 
     return {"properties": properties, "total": total, "page": page, "limit": limit,
