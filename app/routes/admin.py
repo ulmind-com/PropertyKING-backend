@@ -123,11 +123,16 @@ async def admin_list_properties(
 
         primary_img = None
         for img in prop.get("images", []):
-            if img.get("is_primary"):
-                primary_img = img["url"]
+            if isinstance(img, dict) and img.get("is_primary"):
+                primary_img = img.get("url")
                 break
+            elif isinstance(img, str):
+                primary_img = img
+                break
+
         if not primary_img and prop.get("images"):
-            primary_img = prop["images"][0].get("url")
+            first_img = prop["images"][0]
+            primary_img = first_img.get("url") if isinstance(first_img, dict) else first_img
 
         properties.append({
             "id": str(prop["_id"]), "title": prop.get("title", ""), "slug": prop.get("slug", ""),
