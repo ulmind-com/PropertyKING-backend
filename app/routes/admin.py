@@ -290,9 +290,9 @@ async def toggle_user_status(user_id: str, admin: dict = Depends(require_admin))
     return {"message": f"User {'activated' if new_status else 'deactivated'}", "is_active": new_status, "success": True}
 
 
-@router.put("/users/{user_id}/make-admin")
-async def make_user_admin(user_id: str, admin: dict = Depends(require_admin)):
-    """Make a regular user an admin."""
+@router.put("/users/{user_id}/toggle-admin")
+async def toggle_user_admin(user_id: str, admin: dict = Depends(require_admin)):
+    """Toggle a user's admin status."""
     db = get_database()
     try:
         user = await db.users.find_one({"_id": ObjectId(user_id)})
@@ -301,11 +301,15 @@ async def make_user_admin(user_id: str, admin: dict = Depends(require_admin)):
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     
-    if user.get("role") == "admin":
-        raise HTTPException(status_code=400, detail="User is already an admin")
+    # Prevent the main admin from accidentally demoting themselves (if we want)
+    # But for now, we just toggle.
+    current_role = user.get("role", "user")
+    new_role = "user" if current_role == "admin" else "admin"
 
-    await db.users.update_one({"_id": ObjectId(user_id)}, {"$set": {"role": "admin", "updated_at": now_utc()}})
-    return {"message": "User is now an admin", "role": "admin", "success": True}
+    await db.users.update_one({"_id": ObjectId(user_id)}, {"$set": {"role": new_role, "updated_at": now_utc()}})
+    
+    msg = "User is now an admin" if new_role == "admin" else "User admin rights revoked"
+    return {"message": msg, "role": new_role, "success": True}
 
 
 @router.post("/notifications/broadcast")
