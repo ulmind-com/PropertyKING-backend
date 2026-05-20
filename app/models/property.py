@@ -62,11 +62,11 @@ class GeoPoint(BaseModel):
 
 
 class PropertyLocation(BaseModel):
-    address: str
+    address: Optional[str] = None
     unit: Optional[str] = None
-    city: str
-    state: str = Field(..., max_length=2, description="US state abbreviation e.g. 'IL'")
-    zip_code: str = Field(..., pattern=r"^\d{5}(-\d{4})?$")
+    city: Optional[str] = None
+    state: Optional[str] = None
+    zip_code: Optional[str] = None
     county: Optional[str] = None
     neighborhood: Optional[str] = None
     coordinates: GeoPoint = GeoPoint()
@@ -79,8 +79,8 @@ class PropertyDetails(BaseModel):
     total_sqft: Optional[int] = Field(None, ge=0)
     lot_size_sqft: Optional[int] = Field(None, ge=0)
     lot_size_acres: Optional[float] = Field(None, ge=0)
-    year_built: Optional[int] = Field(None, ge=1800, le=2030)
-    stories: Optional[int] = Field(None, ge=1, le=200)
+    year_built: Optional[int] = None
+    stories: Optional[int] = None
     garage_spaces: int = Field(0, ge=0, le=20)
     parking_type: Optional[ParkingType] = None
     basement: Optional[BasementType] = None
@@ -108,8 +108,8 @@ class AdminReview(BaseModel):
 # ─── Request Models ───
 
 class PropertyCreate(BaseModel):
-    title: str = Field(..., min_length=5, max_length=200)
-    description: str = Field(..., min_length=20, max_length=5000)
+    title: str = Field(..., min_length=1, max_length=500)
+    description: Optional[str] = Field(None, max_length=10000)
     property_type_id: str
     listing_type: ListingType
     price: float = Field(..., gt=0)
@@ -126,8 +126,8 @@ class PropertyCreate(BaseModel):
 
 
 class PropertyUpdate(BaseModel):
-    title: Optional[str] = Field(None, min_length=5, max_length=200)
-    description: Optional[str] = Field(None, min_length=20, max_length=5000)
+    title: Optional[str] = Field(None, min_length=1, max_length=500)
+    description: Optional[str] = Field(None, max_length=10000)
     property_type_id: Optional[str] = None
     listing_type: Optional[ListingType] = None
     price: Optional[float] = Field(None, gt=0)
