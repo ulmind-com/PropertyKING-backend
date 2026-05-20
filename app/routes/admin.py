@@ -323,7 +323,7 @@ async def generate_notification_ai(data: AIGenerateRequest, admin: dict = Depend
                     "X-Title": "PropertyKING Admin"
                 },
                 json={
-                    "model": "google/gemini-2.5-flash",
+                    "model": "google/gemini-2.5-flash:free",
                     "messages": [
                         {"role": "system", "content": system_prompt},
                         {"role": "user", "content": data.prompt}
