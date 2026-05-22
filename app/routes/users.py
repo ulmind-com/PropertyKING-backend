@@ -72,6 +72,14 @@ async def update_avatar(file: UploadFile = File(...), current_user: dict = Depen
 @router.put("/me/fcm-token", response_model=MessageResponse)
 async def update_fcm_token(data: FCMTokenUpdate, current_user: dict = Depends(get_current_user)):
     db = get_database()
+    
+    # Remove this token from any other users to prevent duplicate notifications
+    if data.fcm_token:
+        await db.users.update_many(
+            {"fcm_token": data.fcm_token},
+            {"$set": {"fcm_token": None}}
+        )
+        
     await db.users.update_one(
         {"_id": ObjectId(current_user["_id"])},
         {"$set": {"fcm_token": data.fcm_token, "updated_at": now_utc()}})
