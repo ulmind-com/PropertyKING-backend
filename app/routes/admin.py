@@ -413,7 +413,7 @@ async def toggle_user_admin(user_id: str, admin: dict = Depends(require_admin)):
 async def send_broadcast(data: BroadcastNotification, admin: dict = Depends(require_admin)):
     """Broadcast notification to users."""
     count = await broadcast_notification(
-        data.title, data.body, data.type, data.data, data.target_roles, data.target_states)
+        data.title, data.body, data.type, data.data, data.target_roles, data.target_states, data.image_url)
     return {"message": f"Notification sent to {count} users", "recipients": count, "success": True}
 
 

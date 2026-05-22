@@ -40,7 +40,8 @@ async def send_push_notification(
     title: str,
     body: str,
     notification_type: str = "system",
-    data: Optional[Dict] = None
+    data: Optional[Dict] = None,
+    image_url: Optional[str] = None
 ) -> bool:
     """Send a push notification to a specific user and store in DB."""
     db = get_database()
@@ -52,6 +53,7 @@ async def send_push_notification(
         "body": body,
         "type": notification_type,
         "data": data or {},
+        "image_url": image_url,
         "is_read": False,
         "created_at": now_utc()
     }
@@ -76,6 +78,8 @@ async def send_push_notification(
                         "priority": "high",
                         "channelId": "propertyking_channel"
                     }
+                    if image_url:
+                        payload["image"] = image_url
                     r = await client.post("https://exp.host/--/api/v2/push/send", json=payload)
                     resp_body = r.json() if r.status_code == 200 else {}
                     print(f"[EXPO PUSH] Status: {r.status_code}, Response: {resp_body}")
@@ -96,7 +100,8 @@ async def send_push_notification(
                 message = messaging.Message(
                     notification=messaging.Notification(
                         title=title,
-                        body=body
+                        body=body,
+                        image=image_url
                     ),
                     data={
                         "type": notification_type,
@@ -136,12 +141,13 @@ async def send_bulk_notifications(
     title: str,
     body: str,
     notification_type: str = "system",
-    data: Optional[Dict] = None
+    data: Optional[Dict] = None,
+    image_url: Optional[str] = None
 ) -> int:
     """Send push notifications to multiple users."""
     success_count = 0
     for user_id in user_ids:
-        result = await send_push_notification(user_id, title, body, notification_type, data)
+        result = await send_push_notification(user_id, title, body, notification_type, data, image_url)
         if result:
             success_count += 1
     return success_count
@@ -153,7 +159,8 @@ async def broadcast_notification(
     notification_type: str = "system",
     data: Optional[Dict] = None,
     target_roles: Optional[List[str]] = None,
-    target_states: Optional[List[str]] = None
+    target_states: Optional[List[str]] = None,
+    image_url: Optional[str] = None
 ) -> int:
     """Broadcast notification to all or filtered users."""
     db = get_database()
@@ -168,4 +175,4 @@ async def broadcast_notification(
     cursor = db.users.find(query, {"_id": 1})
     user_ids = [str(doc["_id"]) async for doc in cursor]
 
-    return await send_bulk_notifications(user_ids, title, body, notification_type, data)
+    return await send_bulk_notifications(user_ids, title, body, notification_type, data, image_url)

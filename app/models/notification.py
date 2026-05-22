@@ -35,6 +35,7 @@ class BroadcastNotification(BaseModel):
     title: str = Field(..., min_length=3, max_length=100)
     body: str = Field(..., min_length=5, max_length=500)
     type: NotificationType = NotificationType.SYSTEM
+    image_url: Optional[str] = None
     data: Optional[Dict] = None
     target_roles: Optional[List[str]] = None  # Filter by role
     target_states: Optional[List[str]] = None  # Filter by US state
