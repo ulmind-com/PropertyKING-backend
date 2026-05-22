@@ -32,8 +32,8 @@ class NotificationResponse(BaseModel):
 
 
 class BroadcastNotification(BaseModel):
-    title: str = Field(..., min_length=3, max_length=100)
-    body: str = Field(..., min_length=5, max_length=500)
+    title: str = Field(..., min_length=1, max_length=100)
+    body: str = Field(..., min_length=1, max_length=500)
     type: NotificationType = NotificationType.SYSTEM
     image_url: Optional[str] = None
     data: Optional[Dict] = None
