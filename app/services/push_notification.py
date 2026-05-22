@@ -112,16 +112,21 @@ async def send_push_notification(
                         priority="high",
                         notification=messaging.AndroidNotification(
                             sound="default",
-                            channel_id="propertyking_channel"
+                            channel_id="propertyking_channel",
+                            image=image_url
                         )
                     ),
                     apns=messaging.APNSConfig(
                         payload=messaging.APNSPayload(
                             aps=messaging.Aps(
                                 sound="default",
-                                badge=1
+                                badge=1,
+                                mutable_content=True
                             )
-                        )
+                        ),
+                        fcm_options=messaging.APNSFCMOptions(
+                            image=image_url
+                        ) if image_url else None
                     )
                 )
                 messaging.send(message)
