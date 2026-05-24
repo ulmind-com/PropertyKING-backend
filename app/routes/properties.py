@@ -148,7 +148,8 @@ async def list_properties(
         ]
     if property_type_id:
         try:
-            query["property_type_id"] = ObjectId(property_type_id)
+            # Properties may store property_type_id as string or ObjectId — match both
+            query["property_type_id"] = {"$in": [property_type_id, ObjectId(property_type_id)]}
         except Exception:
             query["property_type_id"] = property_type_id
     if listing_type:
