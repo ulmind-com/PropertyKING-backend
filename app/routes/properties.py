@@ -127,6 +127,7 @@ async def list_properties(
     bathrooms_min: Optional[float] = None,
     min_sqft: Optional[int] = None,
     max_sqft: Optional[int] = None,
+    min_views: Optional[int] = None,
     city: Optional[str] = None,
     state: Optional[str] = None,
     zip_code: Optional[str] = None,
@@ -170,6 +171,8 @@ async def list_properties(
     if max_sqft is not None:
         query["details.total_sqft"] = query.get("details.total_sqft", {})
         query["details.total_sqft"]["$lte"] = max_sqft
+    if min_views is not None:
+        query["views_count"] = {"$gte": min_views}
     if city:
         query["location.city"] = {"$regex": city, "$options": "i"}
     if state:
@@ -313,9 +316,9 @@ async def top_viewed_properties(
     exclude_ids: Optional[str] = Query(None, description="Comma-separated property IDs to exclude"),
     current_user: Optional[dict] = Depends(get_current_user_optional)
 ):
-    """Get properties sorted by most views."""
+    """Get properties sorted by most views. Only genuinely-viewed properties (views > 0)."""
     db = get_database()
-    query = {"status": "active"}
+    query = {"status": "active", "views_count": {"$gt": 0}}
 
     if exclude_ids:
         ids_to_exclude = [eid.strip() for eid in exclude_ids.split(",") if eid.strip()]
