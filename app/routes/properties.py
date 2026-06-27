@@ -181,7 +181,7 @@ async def list_properties(
         am_list = amenities.split(",")
         query["amenities"] = {"$all": am_list}
 
-    sort_field = sort_by if sort_by in ["price", "created_at", "details.total_sqft", "views_count"] else "created_at"
+    sort_field = sort_by if sort_by in ["price", "created_at", "details.total_sqft", "views_count", "favorites_count"] else "created_at"
     sort_dir = -1 if sort_order == "desc" else 1
 
     total = await db.properties.count_documents(query)
