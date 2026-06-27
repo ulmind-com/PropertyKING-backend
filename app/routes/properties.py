@@ -161,10 +161,11 @@ async def list_properties(
     if max_price is not None:
         query["price"] = query.get("price", {})
         query["price"]["$lte"] = max_price
+    # Exact match — selecting "2" returns properties with exactly 2 bedrooms/bathrooms, not 2+
     if bedrooms_min is not None:
-        query["details.bedrooms"] = {"$gte": bedrooms_min}
+        query["details.bedrooms"] = bedrooms_min
     if bathrooms_min is not None:
-        query["details.bathrooms"] = {"$gte": bathrooms_min}
+        query["details.bathrooms"] = bathrooms_min
     if min_sqft is not None:
         query["details.total_sqft"] = query.get("details.total_sqft", {})
         query["details.total_sqft"]["$gte"] = min_sqft
