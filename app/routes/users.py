@@ -8,7 +8,7 @@ from bson import ObjectId
 
 from app.database import get_database
 from app.middleware.auth import get_current_user
-from app.models.user import UserProfileUpdate, FCMTokenUpdate, UserResponse, UserPublicProfile, MessageResponse
+from app.models.user import UserProfileUpdate, FCMTokenUpdate, UserResponse, UserPublicProfile, MessageResponse, LastKnownLocation
 from app.services.image_upload import upload_image
 from app.utils.helpers import now_utc
 
@@ -88,31 +88,14 @@ async def update_fcm_token(data: FCMTokenUpdate, current_user: dict = Depends(ge
 
 
 @router.put("/me/location", response_model=MessageResponse)
-async def update_my_location(data: dict, current_user: dict = Depends(get_current_user)):
+async def update_my_location(data: LastKnownLocation, current_user: dict = Depends(get_current_user)):
     """Update user's last known location (fire-and-forget from app/website)."""
     db = get_database()
-    lat = data.get("lat")
-    lon = data.get("lon")
-    name = data.get("name", "")
-
-    if lat is None or lon is None:
-        raise HTTPException(status_code=400, detail="lat and lon are required")
-
-    try:
-        lat = float(lat)
-        lon = float(lon)
-    except (ValueError, TypeError):
-        raise HTTPException(status_code=400, detail="lat and lon must be numbers")
-
-    if lat < -90 or lat > 90:
-        raise HTTPException(status_code=400, detail="lat must be between -90 and 90")
-    if lon < -180 or lon > 180:
-        raise HTTPException(status_code=400, detail="lon must be between -180 and 180")
 
     location_data = {
-        "lat": lat,
-        "lon": lon,
-        "name": str(name).strip() if name else "",
+        "lat": data.lat,
+        "lon": data.lon,
+        "name": data.name.strip() if data.name else "",
         "updated_at": now_utc()
     }
 
