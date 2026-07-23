@@ -31,6 +31,13 @@ class UserLocation(BaseModel):
     address: Optional[str] = None
 
 
+class LastKnownLocation(BaseModel):
+    lat: float
+    lon: float
+    name: Optional[str] = None
+    updated_at: Optional[datetime] = None
+
+
 # ─── Auth Models ───
 
 class UserRegister(BaseModel):
@@ -108,6 +115,7 @@ class UserResponse(BaseModel):
     listings_count: int = 0
     leads_count: int = 0
     is_active: bool = True
+    last_known_location: Optional[dict] = None
     created_at: Optional[datetime] = None
 
 

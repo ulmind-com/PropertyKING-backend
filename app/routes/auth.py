@@ -44,6 +44,7 @@ def build_user_response(user: dict) -> UserResponse:
         verified=user.get("verified", False),
         location=user.get("location"),
         is_active=user.get("is_active", True),
+        last_known_location=user.get("last_known_location"),
         created_at=user.get("created_at")
     )
 

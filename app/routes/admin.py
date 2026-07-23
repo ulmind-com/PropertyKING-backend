@@ -363,7 +363,8 @@ async def admin_list_users(
             "avatar": user.get("avatar"), "role": user.get("role", "user"),
             "lister_type": user.get("lister_type"), "verified": user.get("verified", False),
             "is_active": user.get("is_active", True), "listings_count": listings_count,
-            "location": user.get("location"), "created_at": user.get("created_at")
+            "location": user.get("location"), "last_known_location": user.get("last_known_location"),
+            "created_at": user.get("created_at")
         })
 
     return {"users": users, "total": total, "page": page, "limit": limit,

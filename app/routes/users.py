@@ -24,7 +24,8 @@ def build_user_resp(user: dict, favorites_count=0, listings_count=0, leads_count
         company_name=user.get("company_name"), bio=user.get("bio"),
         verified=user.get("verified", False), location=user.get("location"),
         favorites_count=favorites_count, listings_count=listings_count, leads_count=leads_count,
-        is_active=user.get("is_active", True), created_at=user.get("created_at"))
+        is_active=user.get("is_active", True), last_known_location=user.get("last_known_location"),
+        created_at=user.get("created_at"))
 
 
 @router.get("/me", response_model=UserResponse)
@@ -84,6 +85,43 @@ async def update_fcm_token(data: FCMTokenUpdate, current_user: dict = Depends(ge
         {"_id": ObjectId(current_user["_id"])},
         {"$set": {"fcm_token": data.fcm_token, "updated_at": now_utc()}})
     return MessageResponse(message="FCM token updated")
+
+
+@router.put("/me/location", response_model=MessageResponse)
+async def update_my_location(data: dict, current_user: dict = Depends(get_current_user)):
+    """Update user's last known location (fire-and-forget from app/website)."""
+    db = get_database()
+    lat = data.get("lat")
+    lon = data.get("lon")
+    name = data.get("name", "")
+
+    if lat is None or lon is None:
+        raise HTTPException(status_code=400, detail="lat and lon are required")
+
+    try:
+        lat = float(lat)
+        lon = float(lon)
+    except (ValueError, TypeError):
+        raise HTTPException(status_code=400, detail="lat and lon must be numbers")
+
+    if lat < -90 or lat > 90:
+        raise HTTPException(status_code=400, detail="lat must be between -90 and 90")
+    if lon < -180 or lon > 180:
+        raise HTTPException(status_code=400, detail="lon must be between -180 and 180")
+
+    location_data = {
+        "lat": lat,
+        "lon": lon,
+        "name": str(name).strip() if name else "",
+        "updated_at": now_utc()
+    }
+
+    await db.users.update_one(
+        {"_id": ObjectId(current_user["_id"])},
+        {"$set": {"last_known_location": location_data, "updated_at": now_utc()}}
+    )
+
+    return MessageResponse(message="Location updated successfully")
 
 
 @router.delete("/me", response_model=MessageResponse)
