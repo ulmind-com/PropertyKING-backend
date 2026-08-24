@@ -85,6 +85,32 @@ async def create_indexes():
     # Saved Searches
     await db.saved_searches.create_index("user_id")
 
+    # ─── Distressed property sync ───
+    # Dedupe key for imported listings: one record per (provider, external id).
+    # Sparse so the millions of user-created listings without a source are exempt.
+    await db.properties.create_index(
+        [("source.provider", 1), ("source.external_id", 1)],
+        unique=True, sparse=True, name="source_dedupe"
+    )
+    await db.properties.create_index("distress.is_distressed")
+    await db.properties.create_index("distress.type")
+    await db.properties.create_index("claim.status")
+    await db.properties.create_index("claim.claimed_by")
+    await db.properties.create_index([("distress.is_distressed", 1), ("claim.status", 1), ("status", 1)])
+
+    # Claims
+    await db.property_claims.create_index([("property_id", 1), ("status", 1)])
+    await db.property_claims.create_index([("user_id", 1), ("status", 1)])
+    await db.property_claims.create_index("created_at")
+
+    # Edit requests
+    await db.property_edit_requests.create_index([("property_id", 1), ("status", 1)])
+    await db.property_edit_requests.create_index([("user_id", 1), ("status", 1)])
+    await db.property_edit_requests.create_index("created_at")
+
+    # Sync run history
+    await db.sync_runs.create_index("started_at")
+
     print("[OK] Database indexes created")
 
 

@@ -39,3 +39,6 @@ Pillow==11.1.0
 
 # Date handling
 python-dateutil==2.9.0
+
+# Scheduled distressed-property sync
+APScheduler==3.11.0

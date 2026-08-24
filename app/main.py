@@ -15,9 +15,12 @@ from app.utils.helpers import now_utc
 from app.middleware.auth import hash_password
 from app.services.push_notification import init_firebase
 
+from app.services.scheduler import start_scheduler, shutdown_scheduler
+
 # Import all route modules
 from app.routes import auth, users, properties, property_types, amenities
 from app.routes import favorites, inquiries, reviews, notifications, upload, admin
+from app.routes import claims, sync
 
 
 async def seed_defaults():
@@ -79,11 +82,13 @@ async def lifespan(app: FastAPI):
     await connect_to_database()
     await seed_defaults()
     init_firebase()
+    start_scheduler()
     print(f"[OK] PropertyKING API is ready! (env: {settings.APP_ENV})")
 
     yield
 
     # Shutdown
+    shutdown_scheduler()
     await close_database_connection()
 
 
@@ -120,6 +125,9 @@ app.include_router(reviews.router, prefix=API_PREFIX)
 app.include_router(notifications.router, prefix=API_PREFIX)
 app.include_router(upload.router, prefix=API_PREFIX)
 app.include_router(admin.router, prefix=API_PREFIX)
+app.include_router(claims.router, prefix=API_PREFIX)
+app.include_router(claims.edit_router, prefix=API_PREFIX)
+app.include_router(sync.router, prefix=API_PREFIX)
 
 
 @app.get("/")

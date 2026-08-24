@@ -105,6 +105,13 @@ class AdminReview(BaseModel):
     rejection_reason: Optional[str] = None
 
 
+# Distressed-import sub-documents live in app/models/sync.py; re-exported here
+# so callers importing property models get the whole picture.
+from app.models.sync import (  # noqa: E402
+    PropertySource, PropertyDistress, PropertyClaim, DistressType, ClaimStatus
+)
+
+
 # ─── Request Models ───
 
 class PropertyCreate(BaseModel):
@@ -181,6 +188,10 @@ class PropertyQuery(BaseModel):
     lat: Optional[float] = None
     lng: Optional[float] = None
     radius_miles: Optional[float] = Field(None, ge=0.1, le=100)
+    # Distressed filters
+    is_distressed: Optional[bool] = None
+    distress_type: Optional[DistressType] = None
+    claim_status: Optional[ClaimStatus] = None
 
 
 # ─── Response Models ───
@@ -212,6 +223,13 @@ class PropertyResponse(BaseModel):
     contact_phone: Optional[str] = None
     contact_email: Optional[str] = None
     admin_review: Optional[AdminReview] = None
+    # Distressed import / claim state (null for ordinary user listings)
+    source: Optional[PropertySource] = None
+    distress: Optional[PropertyDistress] = None
+    claim: Optional[PropertyClaim] = None
+    has_pending_edit: bool = False
+    is_claimable: bool = False
+    is_owner: bool = False
     views_count: int = 0
     favorites_count: int = 0
     inquiries_count: int = 0

@@ -72,6 +72,19 @@ async def enrich_property(prop: dict, current_user_id: str = None) -> dict:
         })
         prop["is_favorited"] = fav is not None
 
+    # Claim state — who can claim this, and does the caller already own it
+    claim = prop.get("claim") or {}
+    claim_status = claim.get("status", "unclaimed")
+    # Anything imported from an external source is claimable, distressed or not
+    # — this must stay in step with the guard in routes/claims.submit_claim.
+    prop["is_claimable"] = bool(
+        (prop.get("source") or (prop.get("distress") or {}).get("is_distressed"))
+        and claim_status == "unclaimed"
+    )
+    prop["is_owner"] = bool(
+        current_user_id and str(claim.get("claimed_by") or prop.get("listed_by")) == str(current_user_id)
+    )
+
     return prop
 
 
@@ -104,6 +117,12 @@ def build_property_response(prop: dict) -> PropertyResponse:
         contact_phone=prop.get("contact_phone"),
         contact_email=prop.get("contact_email"),
         admin_review=prop.get("admin_review"),
+        source=prop.get("source"),
+        distress=prop.get("distress"),
+        claim=prop.get("claim"),
+        has_pending_edit=prop.get("has_pending_edit", False),
+        is_claimable=prop.get("is_claimable", False),
+        is_owner=prop.get("is_owner", False),
         views_count=prop.get("views_count", 0),
         favorites_count=prop.get("favorites_count", 0),
         inquiries_count=prop.get("inquiries_count", 0),
@@ -132,6 +151,9 @@ async def list_properties(
     state: Optional[str] = None,
     zip_code: Optional[str] = None,
     amenities: Optional[str] = None,
+    is_distressed: Optional[bool] = None,
+    distress_type: Optional[str] = None,
+    claim_status: Optional[str] = None,
     sort_by: str = "created_at",
     sort_order: str = "desc",
     current_user: Optional[dict] = Depends(get_current_user_optional)
@@ -184,8 +206,18 @@ async def list_properties(
         # Check if the property has ALL of the requested amenities
         am_list = amenities.split(",")
         query["amenities"] = {"$all": am_list}
+    # Distressed filters
+    if is_distressed is not None:
+        query["distress.is_distressed"] = True if is_distressed else {"$ne": True}
+    if distress_type:
+        query["distress.type"] = {"$in": distress_type.split(",")}
+    if claim_status:
+        query["claim.status"] = claim_status
 
-    sort_field = sort_by if sort_by in ["price", "created_at", "details.total_sqft", "views_count", "favorites_count"] else "created_at"
+    sort_field = sort_by if sort_by in [
+        "price", "created_at", "details.total_sqft", "views_count", "favorites_count",
+        "distress.estimated_equity", "distress.auction_date"
+    ] else "created_at"
     sort_dir = -1 if sort_order == "desc" else 1
 
     total = await db.properties.count_documents(query)
@@ -528,6 +560,52 @@ async def toggle_property_status(property_id: str, current_user: dict = Depends(
     return {"message": f"Property is now {new_status}", "status": new_status, "success": True}
 
 
+async def _queue_edit_request(prop: dict, changes: dict, current_user: dict) -> PropertyResponse:
+    """
+    Store an owner's proposed changes for admin review instead of applying them.
+    Returns the *unchanged* listing with `has_pending_edit` set, so clients can
+    show "waiting for approval" without a separate request.
+    """
+    from app.routes.claims import build_diff, BLOCKED_EDIT_FIELDS
+
+    db = get_database()
+    property_id = str(prop["_id"])
+
+    changes = {k: v for k, v in changes.items() if k not in BLOCKED_EDIT_FIELDS}
+    diff = build_diff(prop, changes)
+    if not diff:
+        raise HTTPException(status_code=400, detail="Nothing changed")
+
+    existing = await db.property_edit_requests.find_one(
+        {"property_id": property_id, "status": "pending"}
+    )
+    if existing:
+        # Replace the previous draft rather than blocking the owner
+        await db.property_edit_requests.update_one(
+            {"_id": existing["_id"]},
+            {"$set": {"changes": changes, "diff": diff, "created_at": now_utc()}},
+        )
+    else:
+        await db.property_edit_requests.insert_one({
+            "property_id": property_id,
+            "user_id": str(current_user["_id"]),
+            "status": "pending",
+            "changes": changes,
+            "diff": diff,
+            "note": None,
+            "rejection_reason": None,
+            "reviewed_by": None,
+            "reviewed_at": None,
+            "created_at": now_utc(),
+        })
+
+    await db.properties.update_one({"_id": prop["_id"]}, {"$set": {"has_pending_edit": True}})
+
+    prop["has_pending_edit"] = True
+    prop = await enrich_property(prop, current_user["_id"])
+    return build_property_response(prop)
+
+
 @router.put("/{property_id}", response_model=PropertyResponse)
 async def update_property(property_id: str, data: PropertyUpdate, current_user: dict = Depends(get_current_user)):
     """Update a property listing."""
@@ -545,12 +623,30 @@ async def update_property(property_id: str, data: PropertyUpdate, current_user: 
     if str(prop.get("listed_by")) != str(current_user["_id"]) and current_user.get("role") != "admin":
         raise HTTPException(status_code=403, detail="Not authorized")
 
+    # A claimed listing is owned by its claimant but still moderated: their edits
+    # are queued for admin approval rather than written straight to the live doc.
+    # Admins keep the direct-write path so they can fix listings immediately.
+    is_claimed = (prop.get("claim") or {}).get("status") == "claimed"
+    if is_claimed and current_user.get("role") != "admin":
+        # exclude_unset (not exclude_none): PropertyDetails/PropertyLocation have
+        # defaults for every field, so dumping a partially-filled `details` would
+        # otherwise reset everything the caller did not mention — e.g. editing
+        # bedrooms would silently zero out garage_spaces.
+        changes = data.model_dump(exclude_unset=True, mode="json")
+        changes.pop("status", None)
+        return await _queue_edit_request(prop, changes, current_user)
+
     update_data = {}
-    for field, value in data.model_dump(exclude_none=True).items():
+    for field, value in data.model_dump(exclude_unset=True).items():
+        if value is None:
+            continue
         if field == "details" and value:
-            update_data["details"] = value
+            # Merge, don't replace — same defaults problem as above
+            for sub_key, sub_val in value.items():
+                update_data[f"details.{sub_key}"] = sub_val
         elif field == "location" and value:
-            update_data["location"] = value
+            for sub_key, sub_val in value.items():
+                update_data[f"location.{sub_key}"] = sub_val
         elif field == "images" and value:
             update_data["images"] = [img if isinstance(img, dict) else img.model_dump() for img in value]
         else:

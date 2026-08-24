@@ -5,7 +5,6 @@ Loads all environment variables and provides typed settings.
 
 from pydantic_settings import BaseSettings
 from typing import List, Optional
-import os
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -58,6 +57,14 @@ class Settings(BaseSettings):
     MAX_FILE_SIZE_MB: int = 10
     MAX_IMAGES_PER_PROPERTY: int = 20
 
+    # Property Sync — external listing data (RapidAPI / Zillow)
+    RAPIDAPI_KEY: str = ""
+    ZILLOW_RAPIDAPI_HOST: str = "zillow-real-estate-data-api.p.rapidapi.com"
+    ZILLOW_MAX_REQUESTS_PER_RUN: int = 25
+
+    # AI notification copy (admin panel)
+    OPENROUTER_API_KEY: str = ""
+
     @property
     def allowed_origins_list(self) -> List[str]:
         return [origin.strip() for origin in self.ALLOWED_ORIGINS.split(",")]
@@ -65,6 +72,10 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         case_sensitive = True
+        # Ignore unknown keys instead of refusing to start. The .env file is
+        # shared with deploy tooling and scripts, and an unrecognised entry
+        # must never take the whole API down at boot.
+        extra = "ignore"
 
 
 settings = Settings()
