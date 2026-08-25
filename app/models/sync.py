@@ -123,6 +123,16 @@ class SyncSettings(BaseModel):
         DistressType.AUCTION,
         DistressType.BANK_OWNED,
     ]
+    # Rotation: with a small monthly request budget, syncing the same markets
+    # every run wastes it re-fetching data that barely changed. Instead we walk
+    # the city list a few markets at a time, always taking the ones synced
+    # longest ago — so the same 90 requests cover 90 markets a month instead of
+    # refreshing 3 markets thirty times.
+    rotate_cities: bool = True
+    cities_per_run: int = Field(3, ge=1, le=200)
+    # Hard ceiling on API calls per calendar month, matched to the plan.
+    monthly_request_budget: int = Field(100, ge=1, le=1_000_000)
+
     target_states: List[str] = ["TX", "FL", "GA"]
     target_cities: List[str] = []
     target_zip_codes: List[str] = []
@@ -145,6 +155,9 @@ class SyncSettingsUpdate(BaseModel):
     status_types: Optional[List[str]] = None
     home_types: Optional[List[str]] = None
     distress_types: Optional[List[DistressType]] = None
+    rotate_cities: Optional[bool] = None
+    cities_per_run: Optional[int] = Field(None, ge=1, le=200)
+    monthly_request_budget: Optional[int] = Field(None, ge=1, le=1_000_000)
     target_states: Optional[List[str]] = None
     target_cities: Optional[List[str]] = None
     target_zip_codes: Optional[List[str]] = None

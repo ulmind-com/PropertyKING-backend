@@ -26,6 +26,10 @@ from app.services.providers.base import NormalizedProperty
 from app.services.geocoding import geocode_address
 from app.utils.helpers import now_utc, generate_unique_slug
 
+class _BudgetExhausted(Exception):
+    """Raised to end a run cleanly when the monthly allowance is gone."""
+
+
 SETTINGS_KEY = "distressed_sync"
 LOCK_KEY = "distressed_sync_lock"
 LOCK_TTL_MINUTES = 30
@@ -110,6 +114,70 @@ def compute_next_run(settings: SyncSettings, last_run_at: Optional[datetime]) ->
     while nxt <= now_utc():
         nxt += gap
     return nxt
+
+
+# ─── City rotation & monthly quota ───
+
+async def _sync_city_batch(settings: SyncSettings) -> list:
+    """
+    Pick which markets this run should cover.
+
+    Cities are kept in `sync_cities` with the time each was last fetched. Every
+    run takes the ones synced longest ago, so the list is walked evenly and a
+    market added later is picked up on the next run rather than never.
+    """
+    db = get_database()
+    cities = settings.target_cities or []
+    if not settings.rotate_cities or len(cities) <= settings.cities_per_run:
+        return cities
+
+    # Register any city the admin has added since the last run
+    for city in cities:
+        await db.sync_cities.update_one(
+            {"_id": city},
+            {"$setOnInsert": {"last_synced_at": None, "last_count": 0}},
+            upsert=True,
+        )
+    # Drop ones removed from the settings, so they stop competing for slots
+    await db.sync_cities.delete_many({"_id": {"$nin": cities}})
+
+    # Never-synced first (null sorts before dates), then oldest
+    cursor = db.sync_cities.find({}).sort("last_synced_at", 1).limit(settings.cities_per_run)
+    return [doc["_id"] async for doc in cursor]
+
+
+async def _mark_cities_synced(cities: list, fetched: int):
+    db = get_database()
+    per_city = fetched // max(1, len(cities))
+    for city in cities:
+        await db.sync_cities.update_one(
+            {"_id": city},
+            {"$set": {"last_synced_at": now_utc(), "last_count": per_city}},
+            upsert=True,
+        )
+
+
+def _quota_period() -> str:
+    return now_utc().strftime("%Y-%m")
+
+
+async def _quota_used() -> int:
+    """Requests spent in the current calendar month."""
+    doc = await get_sync_settings_doc()
+    if doc.get("quota_period") != _quota_period():
+        return 0
+    return int(doc.get("quota_used") or 0)
+
+
+async def _record_quota(spent: int):
+    db = get_database()
+    period = _quota_period()
+    doc = await get_sync_settings_doc()
+    used = int(doc.get("quota_used") or 0) if doc.get("quota_period") == period else 0
+    await db.sync_settings.update_one(
+        {"_id": SETTINGS_KEY},
+        {"$set": {"quota_period": period, "quota_used": used + spent}},
+    )
 
 
 # ─── Supporting lookups ───
@@ -257,6 +325,7 @@ async def run_sync(trigger: str = SyncTrigger.SCHEDULE, triggered_by: Optional[s
         "trigger": trigger,
         "status": SyncRunStatus.RUNNING.value,
         "fetched": 0, "created": 0, "updated": 0, "skipped": 0, "failed": 0,
+        "cities": [], "requests_used": 0,
         "errors": [],
         "started_at": now_utc(),
         "finished_at": None,
@@ -267,13 +336,41 @@ async def run_sync(trigger: str = SyncTrigger.SCHEDULE, triggered_by: Optional[s
 
     try:
         provider = get_provider(settings.provider)
+
+        batch = await _sync_city_batch(settings)
+        run_doc["cities"] = batch
+
+        # Never spend past the plan's monthly allowance. One request is made per
+        # market per listing status, so trim the batch rather than start a run
+        # that would fail partway through with a 429.
+        used = await _quota_used()
+        remaining = max(0, settings.monthly_request_budget - used)
+        per_city = max(1, len(settings.status_types or ["ForSale"]))
+        affordable = remaining // per_city
+
+        if batch and affordable <= 0:
+            run_doc["status"] = SyncRunStatus.SUCCESS.value
+            run_doc["errors"].append(
+                f"Monthly request budget spent ({used}/{settings.monthly_request_budget}). "
+                "Resumes next month, or raise the budget after upgrading the plan."
+            )
+            raise _BudgetExhausted()
+
+        if batch and len(batch) > affordable:
+            run_doc["errors"].append(
+                f"Budget allows {affordable} more market(s) this month; "
+                f"trimmed from {len(batch)}."
+            )
+            batch = batch[:affordable]
+            run_doc["cities"] = batch
+
         filters = ProviderFilters(
             distressed_only=settings.distressed_only,
             distress_types=[d.value if hasattr(d, "value") else d for d in settings.distress_types],
             status_types=settings.status_types,
             home_types=settings.home_types,
             states=settings.target_states,
-            cities=settings.target_cities,
+            cities=batch,
             zip_codes=settings.target_zip_codes,
             min_price=settings.min_price,
             max_price=settings.max_price,
@@ -282,6 +379,10 @@ async def run_sync(trigger: str = SyncTrigger.SCHEDULE, triggered_by: Optional[s
 
         items = await provider.fetch(filters)
         run_doc["fetched"] = len(items)
+        run_doc["requests_used"] = max(1, len(batch)) * per_city
+        await _record_quota(run_doc["requests_used"])
+        if batch:
+            await _mark_cities_synced(batch, len(items))
 
         type_map = await _property_type_map()
         import_user_id = await get_import_user_id()
@@ -301,6 +402,9 @@ async def run_sync(trigger: str = SyncTrigger.SCHEDULE, triggered_by: Optional[s
             run_doc["status"] = SyncRunStatus.PARTIAL.value
         else:
             run_doc["status"] = SyncRunStatus.FAILED.value
+
+    except _BudgetExhausted:
+        print("[SYNC] Skipped — monthly request budget already spent")
 
     except Exception as exc:
         run_doc["status"] = SyncRunStatus.FAILED.value
@@ -499,8 +603,29 @@ async def sync_overview() -> dict:
         {"$sort": {"count": -1}},
     ]).to_list(20)
 
+    # Rotation coverage — how far through the city list we have got
+    settings = await get_sync_settings()
+    total_cities = len(settings.target_cities or [])
+    covered = await db.sync_cities.count_documents({"last_synced_at": {"$ne": None}})
+    quota_used = (settings_doc.get("quota_used") or 0) \
+        if settings_doc.get("quota_period") == _quota_period() else 0
+    next_batch = await _sync_city_batch(settings)
+
     return {
         "imported": imported,
+        "coverage": {
+            "cities_configured": total_cities,
+            "cities_covered": covered,
+            "cities_per_run": settings.cities_per_run,
+            "rotating": settings.rotate_cities and total_cities > settings.cities_per_run,
+            "next_batch": next_batch,
+        },
+        "quota": {
+            "used": quota_used,
+            "budget": settings.monthly_request_budget,
+            "remaining": max(0, settings.monthly_request_budget - quota_used),
+            "period": _quota_period(),
+        },
         "distressed": distressed,
         "unclaimed": unclaimed,
         "claimed": claimed,
