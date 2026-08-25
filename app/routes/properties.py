@@ -8,6 +8,7 @@ from bson import ObjectId
 from typing import Optional, List
 import math
 import asyncio
+import re
 
 from app.database import get_database
 from app.middleware.auth import get_current_user, get_current_user_optional, require_lister
@@ -424,6 +425,51 @@ async def recommended_properties(
 
 
 
+
+
+@router.get("/locations")
+async def location_suggestions(
+    q: Optional[str] = Query(None, description="Partial city name"),
+    limit: int = Query(8, ge=1, le=25),
+):
+    """
+    Typeahead over the cities we actually have listings in.
+
+    A general-purpose geocoder will happily suggest places with no inventory,
+    which sends the user to an empty result page. These come from the live
+    listings instead, so every suggestion has properties behind it.
+    """
+    db = get_database()
+
+    match: dict = {"status": "active", "location.city": {"$nin": [None, ""]}}
+    if q and q.strip():
+        # Anchored so "au" offers Austin/Aurora rather than every city
+        # containing those letters somewhere.
+        match["location.city"] = {"$regex": f"^{re.escape(q.strip())}", "$options": "i"}
+
+    rows = await db.properties.aggregate([
+        {"$match": match},
+        {"$group": {
+            "_id": {"city": "$location.city", "state": "$location.state"},
+            "count": {"$sum": 1},
+            "lat": {"$first": {"$arrayElemAt": ["$location.coordinates.coordinates", 1]}},
+            "lng": {"$first": {"$arrayElemAt": ["$location.coordinates.coordinates", 0]}},
+        }},
+        {"$sort": {"count": -1}},
+        {"$limit": limit},
+    ]).to_list(limit)
+
+    return {"locations": [
+        {
+            "city": r["_id"]["city"],
+            "state": r["_id"]["state"],
+            "label": ", ".join(p for p in [r["_id"]["city"], r["_id"]["state"]] if p),
+            "count": r["count"],
+            "lat": r.get("lat"),
+            "lng": r.get("lng"),
+        }
+        for r in rows if r["_id"].get("city")
+    ]}
 
 
 @router.get("/{slug}", response_model=PropertyResponse)
