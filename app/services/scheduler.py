@@ -19,7 +19,9 @@ from app.services.property_sync import (
 from app.utils.helpers import now_utc
 
 _scheduler: AsyncIOScheduler | None = None
-CHECK_INTERVAL_MINUTES = 15
+# Must be well under the smallest interval an admin can configure
+# (1 hour), or a short interval would drift by up to a whole tick.
+CHECK_INTERVAL_MINUTES = 5
 
 
 async def _tick():

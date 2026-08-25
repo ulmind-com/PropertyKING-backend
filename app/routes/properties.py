@@ -427,6 +427,84 @@ async def recommended_properties(
 
 
 
+@router.get("/map-pins")
+async def map_pins(
+    lat: Optional[float] = None,
+    lng: Optional[float] = None,
+    radius_miles: float = Query(50, ge=0.1, le=500),
+    city: Optional[str] = None,
+    state: Optional[str] = None,
+    listing_type: Optional[str] = None,
+    min_price: Optional[float] = None,
+    max_price: Optional[float] = None,
+    is_distressed: Optional[bool] = None,
+    limit: int = Query(2000, ge=1, le=5000),
+):
+    """
+    Slim payload for map markers.
+
+    The regular listing endpoints return the full property document, which is
+    far too heavy to send a whole city's worth of. This returns only what a
+    marker needs, so the map can show every match instead of the first page.
+    """
+    db = get_database()
+
+    query: dict = {"status": "active", "location.coordinates.coordinates.0": {"$ne": 0}}
+    if city:
+        query["location.city"] = {"$regex": f"^{re.escape(city)}$", "$options": "i"}
+    if state:
+        query["location.state"] = state.upper()
+    if listing_type:
+        query["listing_type"] = listing_type
+    if is_distressed is not None:
+        query["distress.is_distressed"] = is_distressed
+    if min_price is not None or max_price is not None:
+        query["price"] = {}
+        if min_price is not None:
+            query["price"]["$gte"] = min_price
+        if max_price is not None:
+            query["price"]["$lte"] = max_price
+
+    if lat is not None and lng is not None:
+        query["location.coordinates"] = {
+            "$geoWithin": {"$centerSphere": [[lng, lat], radius_miles / 3963.2]}
+        }
+
+    projection = {
+        "title": 1, "slug": 1, "price": 1, "price_unit": 1, "listing_type": 1,
+        "location.city": 1, "location.state": 1, "location.address": 1,
+        "location.coordinates": 1, "details.bedrooms": 1, "details.bathrooms": 1,
+        "details.total_sqft": 1, "images": {"$slice": 1}, "distress.type": 1,
+    }
+
+    pins = []
+    async for p in db.properties.find(query, projection).limit(limit):
+        coords = ((p.get("location") or {}).get("coordinates") or {}).get("coordinates") or [0, 0]
+        images = p.get("images") or []
+        image = None
+        if images:
+            first = images[0]
+            image = first.get("url") if isinstance(first, dict) else first
+        loc = p.get("location") or {}
+        d = p.get("details") or {}
+        pins.append({
+            "id": str(p["_id"]),
+            "slug": p.get("slug"),
+            "title": p.get("title"),
+            "price": p.get("price", 0),
+            "price_unit": p.get("price_unit", "total"),
+            "listing_type": p.get("listing_type"),
+            "lat": coords[1], "lng": coords[0],
+            "city": loc.get("city"), "state": loc.get("state"), "address": loc.get("address"),
+            "bedrooms": d.get("bedrooms"), "bathrooms": d.get("bathrooms"),
+            "total_sqft": d.get("total_sqft"),
+            "image": image,
+            "distress_type": (p.get("distress") or {}).get("type"),
+        })
+
+    return {"pins": pins, "count": len(pins), "capped": len(pins) >= limit}
+
+
 @router.get("/locations")
 async def location_suggestions(
     q: Optional[str] = Query(None, description="Partial city name"),

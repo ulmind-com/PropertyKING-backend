@@ -82,8 +82,15 @@ async def save_sync_settings(changes: dict, admin_id: Optional[str] = None) -> d
     return await get_sync_settings_doc()
 
 
+def sync_interval(settings: SyncSettings) -> timedelta:
+    """The configured gap between runs. Hours win over days when both are set."""
+    if settings.interval_hours:
+        return timedelta(hours=settings.interval_hours)
+    return timedelta(days=settings.interval_days)
+
+
 def compute_next_run(settings: SyncSettings, last_run_at: Optional[datetime]) -> Optional[datetime]:
-    """Next scheduled run: last run + interval, pinned to the configured hour."""
+    """Next scheduled run: last run + interval."""
     if not settings.enabled:
         return None
 
@@ -91,12 +98,17 @@ def compute_next_run(settings: SyncSettings, last_run_at: Optional[datetime]) ->
     if base.tzinfo is None:
         base = base.replace(tzinfo=timezone.utc)
 
-    nxt = base + timedelta(days=settings.interval_days)
-    nxt = nxt.replace(hour=settings.run_hour_utc, minute=0, second=0, microsecond=0)
+    gap = sync_interval(settings)
+    nxt = base + gap
+
+    # A sub-daily interval must keep its own rhythm; pinning it to one hour of
+    # the day would collapse every run onto a single daily slot.
+    if not settings.interval_hours:
+        nxt = nxt.replace(hour=settings.run_hour_utc, minute=0, second=0, microsecond=0)
 
     # Never schedule into the past (e.g. after shrinking the interval)
     while nxt <= now_utc():
-        nxt += timedelta(days=settings.interval_days)
+        nxt += gap
     return nxt
 
 

@@ -359,8 +359,10 @@ class ReefZillowProvider(BaseProvider):
         else:
             title = f"{bits} in {where}" if bits else where
 
+        # No provider name in copy the public site renders — the listing should
+        # read as a PropertyKING listing, not an attributed scrape.
         description = (
-            (f"{label} listing sourced from Zillow. " if label else "Listing sourced from Zillow. ")
+            (f"{label} opportunity. " if label else "")
             + f"{street or 'Address withheld'}, {city or ''} {state or ''} {zip_code or ''}. ".replace("  ", " ")
             + f"{beds} bed / {baths} bath"
             + (f", {int(sqft):,} sq ft" if sqft else "")

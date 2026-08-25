@@ -103,6 +103,9 @@ class SyncSettings(BaseModel):
     enabled: bool = True
     provider: str = "mock"
     interval_days: int = Field(1, ge=1, le=90)
+    # When set, this wins over interval_days. Lets the sync run several
+    # times a day, which interval_days alone cannot express.
+    interval_hours: Optional[int] = Field(None, ge=1, le=2160)
     run_hour_utc: int = Field(3, ge=0, le=23)        # which hour of the day to run
     auto_publish: bool = True                        # imported -> active vs pending
     max_per_run: int = Field(100, ge=1, le=200_000)
@@ -134,6 +137,7 @@ class SyncSettingsUpdate(BaseModel):
     enabled: Optional[bool] = None
     provider: Optional[str] = None
     interval_days: Optional[int] = Field(None, ge=1, le=90)
+    interval_hours: Optional[int] = Field(None, ge=1, le=2160)
     run_hour_utc: Optional[int] = Field(None, ge=0, le=23)
     auto_publish: Optional[bool] = None
     max_per_run: Optional[int] = Field(None, ge=1, le=200_000)
